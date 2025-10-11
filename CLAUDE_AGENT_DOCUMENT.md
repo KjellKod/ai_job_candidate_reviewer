@@ -29,6 +29,9 @@ The AI Job Candidate Reviewer is a pipeline-based system that automates first-pa
 - `--show-candidates "job_name"`: Display ranked results
 - `--list-jobs`: Show available jobs
 - `--test-connection`: Verify OpenAI API connectivity
+- `--provide-feedback "job_name" "candidate_name"`: Interactive feedback collection
+- `--re-evaluate "job_name" [candidate_names]`: Re-evaluate with updated insights
+- `--show-insights "job_name"`: Display current AI insights for job
 
 **Architecture**:
 ```python
@@ -103,6 +106,32 @@ class Evaluation:
     concerns: List[str]
     interview_priority: str  # HIGH, MEDIUM, LOW
     detailed_notes: str
+    timestamp: datetime
+    ai_insights_used: Optional[str] = None  # Insights applied during evaluation
+
+@dataclass
+class HumanFeedback:
+    evaluation_id: str
+    human_recommendation: str  # STRONG_YES, YES, MAYBE, NO, STRONG_NO
+    human_score: Optional[int] = None  # 0-100, optional
+    feedback_notes: str
+    specific_corrections: Dict[str, str]  # field -> corrected_value
+    timestamp: datetime
+
+@dataclass  
+class JobInsights:
+    job_name: str
+    generated_insights: str  # AI-generated insights from feedback patterns
+    feedback_count: int
+    last_updated: datetime
+    effectiveness_metrics: Dict[str, float]  # accuracy improvements, etc.
+
+@dataclass
+class FeedbackRecord:
+    candidate_name: str
+    original_evaluation: Evaluation
+    human_feedback: HumanFeedback
+    insights_generated: Optional[str] = None
 ```
 
 ### 5. Output Generation (`output_generator.py`)  
@@ -144,6 +173,26 @@ class Config:
     jobs_path: str
     candidates_path: str
     output_path: str
+    max_file_size_mb: int = 2
+```
+
+### 7. Feedback System (`feedback_manager.py`)
+**Responsibility**: Human feedback collection and AI learning system
+
+**Key Functions**:
+- Collect human feedback on AI evaluations
+- Build job-specific insights from feedback patterns
+- Enable re-evaluation of candidates with updated insights
+- Track feedback effectiveness over time
+
+**Architecture**:
+```python
+class FeedbackManager:
+    def __init__(self, config: Config)
+    def collect_feedback(self, job_name: str, candidate_name: str, feedback: HumanFeedback) -> None
+    def build_insights(self, job_name: str) -> JobInsights  
+    def trigger_re_evaluation(self, job_name: str, candidate_names: List[str] = None) -> None
+    def get_feedback_history(self, job_name: str) -> List[FeedbackRecord]
 ```
 
 ## File Organization Strategy
@@ -165,17 +214,21 @@ data/
 ├── jobs/{job_name}/
 │   ├── job_description.pdf
 │   ├── ideal_candidate.txt
-│   └── warning_flags.txt  
+│   ├── warning_flags.txt
+│   └── insights.json              # AI-generated insights from feedback
 ├── candidates/{job_name}/
 │   └── {candidate_name}/
 │       ├── resume.pdf
 │       ├── cover_letter.pdf  
 │       ├── application.txt
-│       └── review.json
+│       ├── evaluation.json        # Current AI evaluation
+│       ├── evaluation_history.json # Previous evaluations
+│       └── feedback.json          # Human feedback records
 └── output/{job_name}/
     ├── candidate_scores.csv
     ├── summary_report.html
-    └── detailed_reviews/
+    ├── detailed_reviews/
+    └── feedback_summary.json      # Aggregated feedback metrics
 ```
 
 ## Processing Pipeline
@@ -195,15 +248,27 @@ Intake Files → Name Extraction → Text Extraction → AI Evaluation → Resul
 Stored Results → Ranking → Terminal Display / CSV Opening
 ```
 
+### 4. Feedback Learning Flow
+```
+AI Evaluation → Human Review → Feedback Collection → Insight Generation → Updated Job Context → Re-evaluation (Optional)
+```
+
+### 5. File Size Validation Flow
+```
+File Upload → Size Check (2MB limit) → Accept/Reject → Error Message (if rejected)
+```
+
 ## API Integration Strategy
 
 ### OpenAI Integration
-- **Connection Testing**: Minimal API call to verify connectivity
+- **Model**: GPT-5 (latest available model)
+- **Connection Testing**: Minimal API call to verify connectivity  
 - **Rate Limiting**: Built-in retry logic with exponential backoff
 - **Error Handling**: Graceful degradation with clear error messages
 - **Prompt Engineering**: Structured prompts for consistent evaluation format
+- **Feedback Integration**: Dynamic prompt enhancement using job-specific insights
 
-### Sample Evaluation Prompt Structure
+### Enhanced Evaluation Prompt Structure (with Feedback Learning)
 ```
 You are evaluating job candidates. Analyze the following:
 
@@ -215,6 +280,10 @@ IDEAL CANDIDATE PROFILE:
 
 WARNING FLAGS:
 {warning_flags}
+
+AI INSIGHTS FROM PREVIOUS FEEDBACK:
+{job_insights}
+Note: These insights were generated from human feedback on previous evaluations for this role.
 
 CANDIDATE MATERIALS:
 Resume: {resume_text}
@@ -228,22 +297,47 @@ Provide evaluation in this exact JSON format:
   "strengths": ["strength1", "strength2"],
   "concerns": ["concern1", "concern2"], 
   "interview_priority": "HIGH|MEDIUM|LOW",
-  "detailed_notes": "comprehensive evaluation"
+  "detailed_notes": "comprehensive evaluation",
+  "insights_applied": "which specific insights influenced this evaluation"
+}
+```
+
+### Insight Generation Prompt (for Feedback Learning)
+```
+Based on the following human feedback patterns for the job "{job_name}", generate specific insights that will improve future candidate evaluations:
+
+JOB CONTEXT:
+- Description: {job_description}
+- Ideal Candidate: {ideal_candidate} 
+- Warning Flags: {warning_flags}
+
+FEEDBACK PATTERNS:
+{aggregated_feedback_data}
+
+Generate insights in this JSON format:
+{
+  "evaluation_criteria_refinements": "specific adjustments to scoring criteria",
+  "strength_identification_patterns": "what human reviewers consistently value",
+  "concern_identification_patterns": "what human reviewers consistently flag", 
+  "scoring_calibration": "adjustments to overall scoring approach",
+  "recommendation_logic": "refined logic for recommendation categories"
 }
 ```
 
 ## Testing Strategy
 
 ### Unit Tests (Fast, No External Dependencies)
-- **File Processing**: Test with temporary files and known content
-- **Data Models**: Validate serialization, validation rules
+- **File Processing**: Test with temporary files and known content (including 2MB size limit)
+- **Data Models**: Validate serialization, validation rules, feedback structures
 - **Output Generation**: Test CSV/terminal formatting with mock data
 - **Configuration**: Test environment loading with temporary .env files
+- **Feedback System**: Test insight generation logic, feedback aggregation
 
 ### Integration Tests (Real External Dependencies)  
-- **API Connectivity**: Test real OpenAI calls with test account
+- **API Connectivity**: Test real OpenAI calls with GPT-5 (test account)
 - **End-to-End Pipeline**: Process real files through complete workflow
-- **Error Scenarios**: Network failures, invalid files, missing API keys
+- **Feedback Loop**: Test complete feedback → insight → re-evaluation cycle
+- **Error Scenarios**: Network failures, invalid files, missing API keys, oversized files
 
 ### Test Organization
 ```
@@ -252,44 +346,56 @@ tests/
 │   ├── test_file_processor.py
 │   ├── test_models.py  
 │   ├── test_output_generator.py
-│   └── test_config.py
+│   ├── test_config.py
+│   └── test_feedback_manager.py
 ├── integration/
 │   ├── test_api_client.py
 │   ├── test_end_to_end_pipeline.py
+│   ├── test_feedback_loop.py
 │   └── test_error_scenarios.py
 └── fixtures/
     ├── sample_job_description.pdf
     ├── sample_resume.pdf
-    └── sample_responses.json
+    ├── sample_responses.json
+    ├── sample_feedback.json
+    └── large_file_2mb_plus.pdf
 ```
 
 ## Implementation Phases
 
-### Phase 1: Foundation
+### Phase 1: Foundation & Core Pipeline
 1. Setup project structure and dependencies (`requirements.txt`)
-2. Implement configuration management (`config.py`)  
-3. Create data models (`models.py`)
-4. Build API client with connection testing (`open_api_test_connection.py`)
+2. Implement configuration management with 2MB file size limits (`config.py`)  
+3. Create data models including feedback structures (`models.py`)
+4. Build API client with GPT-5 integration and connection testing (`open_api_test_connection.py`)
+5. Implement file processing with size validation (`file_processor.py`)
+6. Build output generation (`output_generator.py`)  
+7. Create main CLI interface for basic operations (`candidate_reviewer.py`)
 
-### Phase 2: Core Pipeline
-1. Implement file processing (`file_processor.py`)
-2. Build output generation (`output_generator.py`)  
-3. Create main CLI interface (`candidate_reviewer.py`)
-4. Add comprehensive error handling
+### Phase 2: Feedback System & Learning
+1. Implement feedback manager (`feedback_manager.py`)
+2. Add feedback collection CLI commands (`--provide-feedback`)
+3. Build insight generation from feedback patterns  
+4. Implement re-evaluation functionality (`--re-evaluate`)
+5. Add insight display functionality (`--show-insights`)
+6. Enhanced prompt engineering with dynamic insight integration
 
-### Phase 3: Refinement  
-1. Optimize prompt engineering for consistent results
-2. Add advanced file format support
-3. Implement result caching and incremental processing
-4. Create comprehensive test suite
+### Phase 3: Optimization & Polish
+1. Serial processing optimization with future concurrency design
+2. Advanced error handling and user guidance
+3. Result caching and incremental processing
+4. Comprehensive test suite (unit + integration)
+5. Performance monitoring and feedback effectiveness tracking
 
 ## Error Handling Strategy
 
 ### User-Friendly Errors
 - Missing API key → Clear instructions to add to .env
 - No files in intake → Instructions on file placement and naming
-- API failures → Connection troubleshooting steps
+- Oversized files (≥2MB) → Clear file size limit message with suggestions
+- API failures → Connection troubleshooting steps  
 - Invalid file formats → Supported format guidance
+- Missing feedback context → Guidance on providing meaningful feedback
 
 ### Graceful Degradation
 - Partial file processing continues even if some files fail
@@ -323,18 +429,13 @@ tests/
 - Implement intelligent retry logic with exponential backoff
 - Cache results to avoid duplicate API calls for same candidate
 
-## Questions for Clarification
+## Requirements Clarifications (Confirmed)
 
-1. **API Model Selection**: Should we default to GPT-4 or GPT-3.5-turbo for evaluations? What's the preference for cost vs. quality?
-
-2. **File Size Limits**: What are reasonable limits for PDF file sizes? Should we compress or reject oversized files?
-
-3. **Concurrent Processing**: How many candidates should we process simultaneously to balance speed vs. API rate limits?
-
-4. **Result Persistence**: Should we store raw API responses for audit trails, or just the structured evaluations?
-
-5. **Incremental Updates**: If a job description changes, should we re-evaluate all existing candidates or just process new ones?
-
-6. **Human Feedback Loop**: The README mentions learning from feedback - should we implement a feedback mechanism in this phase or save for later?
+1. **API Model Selection**: Use GPT-5 (latest model available)
+2. **File Size Limits**: Reject files 2MB or larger with clear error message  
+3. **Processing Strategy**: Serial processing initially, designed for future concurrency scaling
+4. **Result Persistence**: Store structured JSON (agent-processable + human-readable)
+5. **Incremental Updates**: Re-evaluate existing candidates when job description changes (rare scenarios)
+6. **Human Feedback Loop**: Critical feature - implement comprehensive feedback system for continuous improvement
 
 This document provides the foundation for building a robust, maintainable AI Job Candidate Reviewer system following the specified principles and requirements.
