@@ -102,7 +102,9 @@ class TestOutputGenerator:
                 ]
 
                 # Generate HTML report
-                html_path = generator.generate_html_report(job_context, evaluations, temp_dir)
+                html_path = generator.generate_html_report(
+                    job_context, evaluations, temp_dir
+                )
 
                 # Verify file was created
                 assert os.path.exists(html_path)
@@ -144,6 +146,7 @@ class TestOutputGenerator:
 
                 # Verify JSON content
                 import json
+
                 with open(json_path, "r") as f:
                     data = json.load(f)
                     assert data["candidate_name"] == "test_candidate"
@@ -206,7 +209,7 @@ class TestOutputGenerator:
                 generator = OutputGenerator(config)
 
                 job_name = "test_job"
-                
+
                 # Create candidate directories with evaluations
                 candidates_dir = Path(config.candidates_path) / job_name
                 candidates_dir.mkdir(parents=True, exist_ok=True)
@@ -232,6 +235,7 @@ class TestOutputGenerator:
                     # Save evaluation
                     eval_path = candidate_dir / "evaluation.json"
                     import json
+
                     with open(eval_path, "w") as f:
                         json.dump(evaluation.to_dict(), f)
 

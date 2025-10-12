@@ -1052,11 +1052,18 @@ class CandidateReviewer:
         job_dir = Path(self.config.get_job_path(job_name))
 
         # For now, reconstruct from files
-        desc_file = job_dir / "job_description.pdf"
+        # Try different extensions for job description
+        desc_file = None
+        for ext in [".pdf", ".txt", ".md"]:
+            candidate_file = job_dir / f"job_description{ext}"
+            if candidate_file.exists():
+                desc_file = candidate_file
+                break
+
         ideal_file = job_dir / "ideal_candidate.txt"
         warning_file = job_dir / "warning_flags.txt"
 
-        if not desc_file.exists():
+        if not desc_file or not desc_file.exists():
             return None
 
         # Extract text from files
@@ -1212,8 +1219,16 @@ class CandidateReviewer:
         print(f"🗑️  Found {len(items_to_remove)} items to remove for job '{job_name}':")
         print("\n📋 WILL KEEP (Job Setup & Learning):")
         print("   ✅ Job description, ideal candidate, warning flags")
-        print("   ✅ AI insights from feedback (data/jobs/{}/insights.json)".format(job_name))
-        print("   ✅ Feedback summary (data/output/{}/feedback_summary.json)".format(job_name))
+        print(
+            "   ✅ AI insights from feedback (data/jobs/{}/insights.json)".format(
+                job_name
+            )
+        )
+        print(
+            "   ✅ Feedback summary (data/output/{}/feedback_summary.json)".format(
+                job_name
+            )
+        )
 
         print("\n🗑️  WILL DELETE (Candidates & Reports):")
         for item_type, item_path in items_to_remove:

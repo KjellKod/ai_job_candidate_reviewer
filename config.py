@@ -24,7 +24,7 @@ class Config:
         """Initialize configuration.
 
         Args:
-            env_file: Optional path to .env file. If None, looks for .env in 
+            env_file: Optional path to .env file. If None, looks for .env in
                 current directory.
         """
         self.env_file = env_file or ".env"

@@ -587,7 +587,7 @@ class FileProcessor:
 
         - Supports prefix and suffix styles for filenames
         - If multiple files of the same type exist, select the NEWEST by mtime
-        - If different uploads contain complementary files 
+        - If different uploads contain complementary files
           (e.g., resume + application), merge them
 
         Args:

@@ -47,8 +47,10 @@ class TestFeedbackManager:
                 # Create test job and candidate directories
                 job_name = "test_job"
                 candidate_name = "john_doe"
-                
-                candidate_dir = Path(config.get_candidate_path(job_name, candidate_name))
+
+                candidate_dir = Path(
+                    config.get_candidate_path(job_name, candidate_name)
+                )
                 candidate_dir.mkdir(parents=True, exist_ok=True)
 
                 # Create a test evaluation file
@@ -86,7 +88,10 @@ class TestFeedbackManager:
                 with open(feedback_path, "r") as f:
                     feedback_data = json.load(f)
                     assert feedback_data["candidate_name"] == candidate_name
-                    assert feedback_data["human_feedback"]["human_recommendation"] == "STRONG_YES"
+                    assert (
+                        feedback_data["human_feedback"]["human_recommendation"]
+                        == "STRONG_YES"
+                    )
 
     def test_build_insights_insufficient_feedback(self):
         """Test that insights building requires sufficient feedback."""
@@ -108,15 +113,15 @@ class TestFeedbackManager:
                 ai_client = Mock(spec=AIClient)
                 ai_client.model = "gpt-4"
                 ai_client.generate_insights.return_value = '{"test": "insights"}'
-                
+
                 manager = FeedbackManager(config, ai_client)
 
                 job_name = "test_job"
-                
+
                 # Create job directory and context files
                 job_dir = Path(config.get_job_path(job_name))
                 job_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 # Create job description file
                 desc_file = job_dir / "job_description.pdf"
                 desc_file.write_text("Test job description")
@@ -161,9 +166,14 @@ class TestFeedbackManager:
                         json.dump(record.to_dict(), f)
 
                 # Mock file processor for job context loading
-                with patch('feedback_manager.FileProcessor') as mock_processor:
-                    mock_processor.return_value.extract_text_from_file.return_value = ("Test description", None)
-                    
+                with patch("file_processor.FileProcessor") as mock_processor_class:
+                    mock_processor_instance = Mock()
+                    mock_processor_instance.extract_text_from_file.return_value = (
+                        "Test description",
+                        None,
+                    )
+                    mock_processor_class.return_value = mock_processor_instance
+
                     # Build insights
                     insights = manager.build_insights(job_name)
 
@@ -186,7 +196,9 @@ class TestFeedbackManager:
                     candidate_name=f"candidate_{i}",
                     job_name="test_job",
                     overall_score=75,
-                    recommendation=RecommendationType.YES if i < 2 else RecommendationType.NO,
+                    recommendation=(
+                        RecommendationType.YES if i < 2 else RecommendationType.NO
+                    ),
                     strengths=["Test"],
                     concerns=["Test"],
                     interview_priority=InterviewPriority.MEDIUM,
@@ -210,6 +222,6 @@ class TestFeedbackManager:
             metrics = manager._calculate_effectiveness_metrics(records)
 
             # Should have 2/3 agreement (66.7%)
-            assert abs(metrics["agreement_rate"] - (2/3)) < 0.01
+            assert abs(metrics["agreement_rate"] - (2 / 3)) < 0.01
             assert metrics["total_feedback"] == 3
             assert "last_calculated" in metrics

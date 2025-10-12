@@ -84,40 +84,70 @@ class TestFileProcessor:
         # Create temporary files to test with
         temp_files = []
         candidate_files = {}
-        
+
         try:
-            # Create actual temporary files
-            for filename, file_type in [
+            # Create actual temporary files with proper naming
+            test_files = [
                 ("resume_john_doe.pdf", "resume"),
-                ("coverletter_john_doe.pdf", "coverletter"), 
+                ("coverletter_john_doe.pdf", "coverletter"),
                 ("application_john_doe.txt", "application"),
                 ("resume_jane_smith.pdf", "resume"),
                 ("application_jane_smith.txt", "application"),
-            ]:
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f"_{filename}")
+            ]
+
+            for filename, file_type in test_files:
+                # Create temp file with the desired name structure
+                temp_file = tempfile.NamedTemporaryFile(
+                    delete=False, prefix="", suffix=f"_{filename}"
+                )
                 temp_files.append(temp_file.name)
-                candidate_files[temp_file.name] = file_type
+
+                # Rename to have the proper structure for the test
+                proper_name = temp_file.name.replace(
+                    temp_file.name.split("/")[-1], filename
+                )
+                os.rename(temp_file.name, proper_name)
+                temp_files[-1] = proper_name  # Update the list with new name
+                candidate_files[proper_name] = file_type
 
             grouped = processor._group_files_by_candidate(candidate_files)
 
-            # Extract the candidate names (they'll have temp file prefixes)
+            # Should have exactly 2 candidates
+            assert len(grouped) == 2
+
+            # Check that we have the expected candidates (names will be extracted from filenames)
             candidate_names = list(grouped.keys())
-            assert len(candidate_names) == 2
-            
-            # Check that we have the right file types for each candidate
-            for candidate_name in candidate_names:
-                files = grouped[candidate_name]
-                if "coverletter" in files:
-                    # This should be john_doe equivalent
-                    assert "resume" in files
-                    assert "application" in files
-                    assert len(files) == 3
-                else:
-                    # This should be jane_smith equivalent  
-                    assert "resume" in files
-                    assert "application" in files
-                    assert len(files) == 2
-                    
+
+            # Find john_doe and jane_smith equivalents
+            john_candidate = None
+            jane_candidate = None
+
+            for name in candidate_names:
+                files = grouped[name]
+                if len(files) == 3:  # john_doe should have 3 files
+                    john_candidate = name
+                elif len(files) == 2:  # jane_smith should have 2 files
+                    jane_candidate = name
+
+            assert (
+                john_candidate is not None
+            ), f"Should find candidate with 3 files, got: {grouped}"
+            assert (
+                jane_candidate is not None
+            ), f"Should find candidate with 2 files, got: {grouped}"
+
+            # Verify john_doe equivalent has all file types
+            john_files = grouped[john_candidate]
+            assert "resume" in john_files
+            assert "coverletter" in john_files
+            assert "application" in john_files
+
+            # Verify jane_smith equivalent has only resume and application
+            jane_files = grouped[jane_candidate]
+            assert "resume" in jane_files
+            assert "application" in jane_files
+            assert "coverletter" not in jane_files
+
         finally:
             # Clean up temp files
             for temp_file in temp_files:
