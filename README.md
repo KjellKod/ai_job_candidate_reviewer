@@ -83,7 +83,7 @@ data/intake/
 ├── warning_flags.txt                # Optional for --setup-job
 
 ```
-Example for `--process_candidates`
+Example for `process-candidates`
 ```
 data/intake/
 ├── resume_john_doe.pdf              # Required for --process-candidates
