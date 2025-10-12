@@ -1,15 +1,14 @@
 # AI Job Candidate Reviewer
 
-Recruiting at scale is hard — it’s time-consuming, subjective, and inconsistent.
+Recruiting at scale is hard — it's time-consuming, subjective, and inconsistent.
 The AI Job Candidate Reviewer helps teams automate first-pass resume screening while keeping humans firmly in control.
 
-Simply drop resumes and job descriptions into organized folders, and receive AI-generated candidate rankings with detailed notes and scores in a CSV you can open in Excel or Google Sheets.
+Simply drop resumes and job descriptions into organized folders, and receive AI-generated candidate rankings with detailed notes and scores. The system learns from your feedback to refine its screening accuracy over time.
 
-The system learns from your feedback to refine its screening accuracy over time — building reusable context for similar roles and ensuring the process continuously improves.
-
+**🤖 Powered by GPT-5** (with intelligent fallback to GPT-4/GPT-4-turbo). The CLI prints the model used for every AI-related command.
 
 ```
-Candidate → AI Score → Human Feedback → Model Recalibration → Updated Ranking
+Candidate → AI Evaluation → Human Feedback → AI Learning → Improved Evaluations
 ```
 
 How It Helps
@@ -31,31 +30,40 @@ The system improves through human feedback and builds reusable screening context
 ```bash
 # 1. Install and setup environment
 pip install -r requirements.txt
-echo "OPENAI_API_KEY=your_key_here" > .env
+cp .env.example .env
+# Edit .env and add your OpenAI API key
 
-# 2. Setup job (once per position)
-# Drop files into data/intake/jobs/ with standard names:
+# 2. Test connection
+python3 candidate_reviewer.py test-connection
+
+# 3. Setup job (once per position)
+# Drop files into data/intake/:
 # - job_description.pdf (required)
 # - ideal_candidate.txt (optional) 
 # - warning_flags.txt (optional)
-python candidate_reviewer.py --setup-job "job_name"
+python3 candidate_reviewer.py setup-job "mobile_engineer"
 
-# 2. Add candidates (ongoing)
-# Drop files into data/intake/candidates/ with pattern:
+# Update an existing job context later (refresh ideal/warnings)
+python3 candidate_reviewer.py setup-job "mobile_engineer" --update
+
+# 4. Add candidates (ongoing)
+# Drop files into data/intake/:
 # - resume_firstname_lastname.pdf (required)
 # - coverletter_firstname_lastname.pdf (optional)
 # - application_firstname_lastname.txt (optional)
-python candidate_reviewer.py --process-candidates "job_name"
+python3 candidate_reviewer.py process-candidates "mobile_engineer"
 
-# 4. Review and rank candidates
-python candidate_reviewer.py --show_candidates "job_name"     # Quick ranking view
-# OR open data/output/job_name/candidate_scores.csv in Excel  # Detailed spreadsheet
+# 5. Review and rank candidates
+python3 candidate_reviewer.py show-candidates "mobile_engineer"
 
+# 6. Provide feedback to improve AI
+python3 candidate_reviewer.py provide-feedback "mobile_engineer" "candidate_name" "feedback text"
 
-# Other useful commands
-python candidate_reviewer.py --list-jobs                     # Show all jobs
-python candidate_reviewer.py --test-connection               # Test OpenAI API
-python candidate_reviewer.py --help                          # Show all options
+# 7. Re-evaluate with improved AI
+python3 candidate_reviewer.py re-evaluate "mobile_engineer"
+
+# 8. View detailed reports
+python3 candidate_reviewer.py open-reports "mobile_engineer"
 ```
 
 - ✅ **Super simple** - just rename files and drop them
@@ -113,21 +121,70 @@ data/
         └── detailed_reviews/
 ```
 
-## Usage
+Notes:
+- Job setup files are moved from `data/intake/` into `data/jobs/{job_name}/` during setup, keeping intake clean.
+- Candidate files are copied into their candidate directories and the originals in intake are cleaned up after successful processing.
+- If a candidate is missing required files, processing stops at that candidate with a clear error so you can fix/remove and retry.
 
+## All Commands
+
+### **Core Workflow:**
 ```bash
-# Once per job: Job setup
-python candidate_reviewer.py --setup-job "job_name"
-
-# Whenever : Process candidates
-python candidate_reviewer.py --process-candidates "job_name"
-
-# Whenever: List available jobs
-python candidate_reviewer.py --list-jobs
-
-# Whenever: List in ranked order the candidates
-python candidate_reviewer.py --show_candidates "job_name"
+python3 candidate_reviewer.py setup-job "job_name"           # Setup job from intake files
+python3 candidate_reviewer.py process-candidates "job_name"  # Process candidates from intake
+python3 candidate_reviewer.py show-candidates "job_name"     # Show ranked results
 ```
+
+Options:
+- setup-job
+  - `-j, --job-description PATH`  Use a specific job description file
+  - `-i, --ideal-candidate PATH`  Use a specific ideal-candidate file (optional)
+  - `-w, --warning-flags PATH`    Use a specific warning-flags file (optional)
+  - `--update/--no-update`        Update an existing job setup (default: no-update)
+
+- process-candidates
+  - `-r, --resume PATH`           Process a single candidate by file path
+  - `-c, --cover-letter PATH`     Optional cover letter path
+  - `-a, --application PATH`      Optional application/questionnaire path
+  - `-n, --candidate-name TEXT`   Candidate name (required with -r)
+
+- show-candidates: no options
+
+### **Feedback & Learning:**
+```bash
+python3 candidate_reviewer.py provide-feedback "job_name" "candidate_name" "feedback text"
+python3 candidate_reviewer.py show-insights "job_name"       # View AI learning
+python3 candidate_reviewer.py re-evaluate "job_name"         # Re-evaluate with insights
+```
+
+Options:
+- provide-feedback: no options (feedback text optional; if omitted, prompts interactively)
+- show-insights: no options
+- re-evaluate
+  - `-c, --candidates TEXT`       Specify one or more candidates (repeatable)
+
+### **Reports & Analysis:**
+```bash
+python3 candidate_reviewer.py open-reports "job_name"        # Open HTML report in browser
+python3 candidate_reviewer.py list-reports "job_name"        # List all available reports
+```
+
+Options:
+- open-reports: no options
+- list-reports: no options
+
+### **System Management:**
+```bash
+python3 candidate_reviewer.py test-connection                # Test API connection
+python3 candidate_reviewer.py list-models                    # Show available AI models
+python3 candidate_reviewer.py list-jobs                      # Show all jobs
+python3 candidate_reviewer.py --help                         # Show all commands
+```
+
+Options:
+- test-connection: no options
+- list-models: no options
+- list-jobs: no options
 
 ## Results
 
