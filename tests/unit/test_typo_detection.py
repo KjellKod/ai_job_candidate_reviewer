@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Unit tests for typo detection logic in FileProcessor."""
 
-import pytest
 import difflib
 from pathlib import Path
+
+import pytest
 
 
 class TestTypoDetection:
