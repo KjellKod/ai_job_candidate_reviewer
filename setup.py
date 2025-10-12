@@ -6,7 +6,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 with open("requirements.txt", "r", encoding="utf-8") as fh:
-    requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+    requirements = [
+        line.strip() for line in fh if line.strip() and not line.startswith("#")
+    ]
 
 setup(
     name="ai-job-candidate-reviewer",
@@ -17,11 +19,11 @@ setup(
     long_description_content_type="text/markdown",
     py_modules=[
         "candidate_reviewer",
-        "config", 
+        "config",
         "models",
         "open_api_test_connection",
         "file_processor",
-        "output_generator"
+        "output_generator",
     ],
     install_requires=requirements,
     python_requires=">=3.8",
