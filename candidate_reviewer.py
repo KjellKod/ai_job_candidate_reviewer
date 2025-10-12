@@ -1415,13 +1415,13 @@ class CandidateReviewer:
             return False
 
         # Check all job directories for this candidate
-        for job_dir in candidates_base_path.iterdir():
-            if job_dir.is_dir():
-                candidate_dir = job_dir / candidate_name
-                if candidate_dir.exists() and candidate_dir.is_dir():
-                    # Check if there are any files in the candidate directory
-                    if any(candidate_dir.iterdir()):
+        try:
+            for job_dir in candidates_base_path.iterdir():
+                if job_dir.is_dir():
+                    if self.config.candidate_exists(job_dir.name, candidate_name):
                         return True
+        except (OSError, PermissionError):
+            return False
 
         return False
 

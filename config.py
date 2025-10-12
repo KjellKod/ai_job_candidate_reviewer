@@ -179,6 +179,55 @@ class Config:
         """
         return f"{self.output_path}/{job_name}"
 
+    def candidate_exists(self, job_name: str, candidate_name: str) -> bool:
+        """Check if a candidate has been processed and exists in the system.
+
+        Args:
+            job_name: Name of the job
+            candidate_name: Name of the candidate to check
+
+        Returns:
+            True if candidate directory exists and contains files, False otherwise
+        """
+        from pathlib import Path
+
+        candidate_path = Path(self.get_candidate_path(job_name, candidate_name))
+        
+        if not candidate_path.exists() or not candidate_path.is_dir():
+            return False
+        
+        # Check if directory contains any files
+        try:
+            return any(candidate_path.iterdir())
+        except (OSError, PermissionError):
+            return False
+
+    def get_candidates_for_job(self, job_name: str) -> list:
+        """Get list of all candidate names for a job.
+
+        Args:
+            job_name: Name of the job
+
+        Returns:
+            List of candidate names (directory names) for the job.
+            Returns empty list if job has no candidates or doesn't exist.
+        """
+        from pathlib import Path
+
+        candidates_path = Path(self.candidates_path) / job_name
+        
+        if not candidates_path.exists():
+            return []
+        
+        try:
+            return [
+                candidate_dir.name
+                for candidate_dir in candidates_path.iterdir()
+                if candidate_dir.is_dir()
+            ]
+        except (OSError, PermissionError):
+            return []
+
     def __str__(self) -> str:
         """String representation of configuration (without sensitive data)."""
         return f"""Config:
