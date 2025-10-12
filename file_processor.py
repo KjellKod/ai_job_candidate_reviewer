@@ -614,10 +614,10 @@ class FileProcessor:
                 "application",
                 "questionnaire",
             }
-            
+
             # Extract candidate name with improved logic
             candidate_name = None
-            
+
             if parts[0].lower() in type_aliases:
                 # Prefix style: resume_firstname_lastname.pdf
                 candidate_name = "_".join(parts[1:])
@@ -626,29 +626,35 @@ class FileProcessor:
                 candidate_name = "_".join(parts[:-1])
             else:
                 # Check if any part is a type (handles middle positions)
-                type_indices = [i for i, part in enumerate(parts) if part.lower() in type_aliases]
+                type_indices = [
+                    i for i, part in enumerate(parts) if part.lower() in type_aliases
+                ]
                 if type_indices:
                     # Remove all type tokens and join the rest
-                    name_parts = [part for i, part in enumerate(parts) if i not in type_indices]
+                    name_parts = [
+                        part for i, part in enumerate(parts) if i not in type_indices
+                    ]
                     candidate_name = "_".join(name_parts) if name_parts else parts[0]
                 else:
                     # No type found - assume everything after first token is name
                     candidate_name = "_".join(parts[1:]) if len(parts) > 2 else parts[0]
-            
+
             # Additional normalization: clean up common issues
             if candidate_name:
                 # Remove trailing/leading underscores
                 candidate_name = candidate_name.strip("_")
-                
+
                 # Handle cases where type suffix wasn't caught
                 for alias in type_aliases:
                     if candidate_name.lower().endswith(f"_{alias}"):
-                        candidate_name = candidate_name[:-len(f"_{alias}")]
+                        candidate_name = candidate_name[: -len(f"_{alias}")]
                         break
-                
+
                 # Ensure we have a valid name
                 if not candidate_name or candidate_name.lower() in type_aliases:
-                    candidate_name = filename.rsplit(".", 1)[0]  # Use full filename as fallback
+                    candidate_name = filename.rsplit(".", 1)[
+                        0
+                    ]  # Use full filename as fallback
 
             # Normalize file_type aliases
             if file_type in ("cover", "coverletter", "cover_letter"):

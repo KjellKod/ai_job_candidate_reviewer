@@ -230,40 +230,44 @@ class OutputGenerator:
         # Deduplicate by candidate name, keeping the most recent evaluation
         return self._deduplicate_evaluations(evaluations)
 
-    def _deduplicate_evaluations(self, evaluations: List[Evaluation]) -> List[Evaluation]:
+    def _deduplicate_evaluations(
+        self, evaluations: List[Evaluation]
+    ) -> List[Evaluation]:
         """Deduplicate evaluations by candidate name, keeping most recent.
-        
+
         Args:
             evaluations: List of evaluations that may contain duplicates
-            
+
         Returns:
             List of evaluations with duplicates removed
         """
         if not evaluations:
             return evaluations
-            
+
         # Use more sophisticated matching instead of simple key-based grouping
         unique_evaluations = []
-        
+
         for evaluation in evaluations:
             # Check if this candidate already exists in our unique list
             existing_index = None
-            
+
             for i, existing_eval in enumerate(unique_evaluations):
-                if self._are_same_candidate(evaluation.candidate_name, existing_eval.candidate_name):
+                if self._are_same_candidate(
+                    evaluation.candidate_name, existing_eval.candidate_name
+                ):
                     existing_index = i
                     break
-            
+
             if existing_index is not None:
                 # Found a duplicate - keep the better one (prefer full names and more recent)
                 existing_eval = unique_evaluations[existing_index]
-                
+
                 # Prefer full names over partial names (more parts = more specific)
                 existing_parts = len(existing_eval.candidate_name.split("_"))
                 new_parts = len(evaluation.candidate_name.split("_"))
-                
+
                 should_replace = False
-                
+
                 if new_parts > existing_parts:
                     # New name has more parts (more specific) - prefer it
                     should_replace = True
@@ -280,87 +284,91 @@ class OutputGenerator:
                     else:
                         should_replace = False
                         reason = f"older timestamp"
-                
+
                 if should_replace:
                     unique_evaluations[existing_index] = evaluation
-                    print(f"📋 Deduplicated: Replaced {existing_eval.candidate_name} with {evaluation.candidate_name} ({reason})")
+                    print(
+                        f"📋 Deduplicated: Replaced {existing_eval.candidate_name} with {evaluation.candidate_name} ({reason})"
+                    )
                 else:
-                    print(f"📋 Deduplicated: Kept {existing_eval.candidate_name}, skipped {evaluation.candidate_name} ({reason})")
+                    print(
+                        f"📋 Deduplicated: Kept {existing_eval.candidate_name}, skipped {evaluation.candidate_name} ({reason})"
+                    )
             else:
                 # No duplicate found, add to unique list
                 unique_evaluations.append(evaluation)
-        
+
         return unique_evaluations
-    
+
     def _normalize_candidate_name(self, name: str) -> str:
         """Normalize candidate name for deduplication.
-        
+
         Args:
             name: Original candidate name
-            
+
         Returns:
             Normalized name for comparison
         """
         # Convert to lowercase for comparison
         normalized = name.lower()
-        
+
         # Remove common suffixes that indicate file types
         type_suffixes = ["_resume", "_application", "_cover", "_coverletter"]
         for suffix in type_suffixes:
             if normalized.endswith(suffix):
-                normalized = normalized[:-len(suffix)]
+                normalized = normalized[: -len(suffix)]
                 break
-        
+
         # Split into parts for more sophisticated matching
         parts = normalized.split("_")
         parts = [part for part in parts if part]  # Remove empty parts
-        
+
         if not parts:
             return normalized
-            
+
         # For single part names, check if it could be a last name
         if len(parts) == 1:
             single_part = parts[0]
             # This will be used to match against multi-part names containing this part
             return single_part
-            
+
         # For multi-part names, create multiple possible matches
         # This handles firstname_lastname, lastname_firstname, etc.
         if len(parts) >= 2:
             # Primary key: sort all parts for consistent ordering
             primary_key = "_".join(sorted(parts))
             return primary_key
-        
+
         return normalized
-    
+
     def _are_same_candidate(self, name1: str, name2: str) -> bool:
         """Check if two candidate names refer to the same person.
-        
+
         Args:
             name1: First candidate name
             name2: Second candidate name
-            
+
         Returns:
             True if they likely refer to the same person
         """
         norm1 = self._normalize_candidate_name(name1)
         norm2 = self._normalize_candidate_name(name2)
-        
+
         # Direct match
         if norm1 == norm2:
             return True
-            
+
         # Check if one name is contained in the other (handles firstname_lastname vs lastname cases)
         parts1 = set(norm1.split("_"))
         parts2 = set(norm2.split("_"))
-        
+
         # If one is a subset of the other with significant overlap
         if parts1 and parts2:
             intersection = parts1.intersection(parts2)
             # If there's at least one common part and one name is a subset of the other
             if intersection and (parts1.issubset(parts2) or parts2.issubset(parts1)):
                 return True
-                
+
         return False
 
     def generate_summary_stats(self, evaluations: List[Evaluation]) -> Dict:

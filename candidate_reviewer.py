@@ -650,51 +650,53 @@ class CandidateReviewer:
 
     def validate_candidates(self, job_name: str) -> None:
         """Validate that all candidates have required files.
-        
+
         Args:
             job_name: Name of the job to validate
         """
         candidates_path = Path(self.config.candidates_path) / job_name
-        
+
         if not candidates_path.exists():
             print(f"❌ No candidates found for job '{job_name}'")
             return
-            
+
         print(f"📋 Validating candidate files for job: {job_name}")
         print("=" * 60)
-        
+
         complete_applications = []
         missing_cover_letter = []
         missing_application = []
         missing_resume = []
-        
+
         total_candidates = 0
-        
+
         for candidate_dir in candidates_path.iterdir():
             if candidate_dir.is_dir():
                 total_candidates += 1
                 candidate_name = candidate_dir.name
-                
+
                 # Check for required files
                 resume_file = None
                 application_file = None
                 cover_letter_file = None
-                
+
                 for file_path in candidate_dir.iterdir():
-                    if file_path.is_file() and not file_path.name.startswith('evaluation'):
+                    if file_path.is_file() and not file_path.name.startswith(
+                        "evaluation"
+                    ):
                         filename = file_path.name.lower()
-                        if 'resume' in filename and filename.endswith('.pdf'):
+                        if "resume" in filename and filename.endswith(".pdf"):
                             resume_file = file_path.name
-                        elif 'application' in filename and filename.endswith('.txt'):
+                        elif "application" in filename and filename.endswith(".txt"):
                             application_file = file_path.name
-                        elif 'cover' in filename and filename.endswith('.pdf'):
+                        elif "cover" in filename and filename.endswith(".pdf"):
                             cover_letter_file = file_path.name
-                
+
                 # Categorize based on what files they have
                 has_resume = resume_file is not None
                 has_application = application_file is not None
                 has_cover_letter = cover_letter_file is not None
-                
+
                 if not has_resume:
                     missing_resume.append(candidate_name)
                 elif not has_application:
@@ -703,49 +705,67 @@ class CandidateReviewer:
                     complete_applications.append(candidate_name)
                 else:  # has resume and application but no cover letter
                     missing_cover_letter.append(candidate_name)
-        
+
         # Display results
         print(f"\n📊 VALIDATION SUMMARY ({total_candidates} candidates total):")
         print()
-        
+
         if complete_applications:
             print(f"✅ COMPLETE APPLICATIONS ({len(complete_applications)}):")
             print("   (Resume + Application + Cover Letter)")
             for candidate in sorted(complete_applications):
                 print(f"   • {candidate}")
             print()
-        
+
         if missing_cover_letter:
             print(f"📋 MISSING COVER LETTER ({len(missing_cover_letter)}):")
             print("   (Resume + Application only)")
             for candidate in sorted(missing_cover_letter):
                 print(f"   • {candidate}")
             print()
-        
+
         if missing_application:
             print(f"⚠️  MISSING APPLICATION ({len(missing_application)}):")
             print("   (Resume only - no questionnaire/application)")
             for candidate in sorted(missing_application):
                 print(f"   • {candidate}")
             print()
-        
+
         if missing_resume:
             print(f"❌ MISSING RESUME ({len(missing_resume)}):")
             print("   (Critical: No resume found)")
             for candidate in sorted(missing_resume):
                 print(f"   • {candidate}")
             print()
-        
+
         # Summary statistics
-        complete_rate = (len(complete_applications) / total_candidates * 100) if total_candidates > 0 else 0
-        application_rate = ((len(complete_applications) + len(missing_cover_letter)) / total_candidates * 100) if total_candidates > 0 else 0
-        
+        complete_rate = (
+            (len(complete_applications) / total_candidates * 100)
+            if total_candidates > 0
+            else 0
+        )
+        application_rate = (
+            (
+                (len(complete_applications) + len(missing_cover_letter))
+                / total_candidates
+                * 100
+            )
+            if total_candidates > 0
+            else 0
+        )
+
         print("📈 COMPLETION RATES:")
-        print(f"   Complete applications: {complete_rate:.1f}% ({len(complete_applications)}/{total_candidates})")
-        print(f"   Have questionnaire/application: {application_rate:.1f}% ({len(complete_applications) + len(missing_cover_letter)}/{total_candidates})")
-        
+        print(
+            f"   Complete applications: {complete_rate:.1f}% ({len(complete_applications)}/{total_candidates})"
+        )
+        print(
+            f"   Have questionnaire/application: {application_rate:.1f}% ({len(complete_applications) + len(missing_cover_letter)}/{total_candidates})"
+        )
+
         if missing_application:
-            print(f"\n⚠️  {len(missing_application)} candidate(s) missing questionnaire/application files!")
+            print(
+                f"\n⚠️  {len(missing_application)} candidate(s) missing questionnaire/application files!"
+            )
             print("   These candidates may have incomplete evaluations.")
 
     def list_jobs(self) -> List[str]:
