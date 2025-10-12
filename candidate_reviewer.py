@@ -1398,7 +1398,7 @@ class CandidateReviewer:
         Returns:
             Extracted candidate name or None if extraction fails
         """
-        return self.file_processor._extract_candidate_name_from_filename(filename)
+        return self.file_processor.extract_candidate_name_from_filename(filename)
 
     def _candidate_exists_in_system(self, candidate_name: str) -> bool:
         """Check if a candidate has been processed and exists in the system.

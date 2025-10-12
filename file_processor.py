@@ -600,7 +600,7 @@ class FileProcessor:
         duplicates_detected: Dict[str, set] = {}
 
         for file_path, file_type in candidate_files.items():
-            candidate_name = self._extract_candidate_name_from_filename(file_path)
+            candidate_name = self.extract_candidate_name_from_filename(file_path)
             if not candidate_name:
                 continue
 
@@ -613,12 +613,15 @@ class FileProcessor:
 
         return self._format_grouping_results(candidates, duplicates_detected)
 
-    def _extract_candidate_name_from_filename(self, file_path: str) -> Optional[str]:
+    def extract_candidate_name_from_filename(self, file_path: str) -> Optional[str]:
         """Extract candidate name from filename using various naming patterns.
-
+        
+        This is a public API method that can be used by other components
+        to extract candidate names from file paths or filenames.
+        
         Args:
-            file_path: Path to the candidate file
-
+            file_path: Path to the candidate file or just the filename
+            
         Returns:
             Extracted candidate name or None if extraction fails
         """
