@@ -245,23 +245,23 @@ For more configuration options, see `CONFIGURATION.md`.
 
 **1. Drop files here:**
 
-Example for `--setup-job` 
+Example for `setup-job` 
 ```
 data/intake/
-├── job_description.pdf              # Required for --setup-job
-├── ideal_candidate.txt              # Optional for --setup-job  
-├── warning_flags.txt                # Optional for --setup-job
+├── job_description.pdf              # Required for setup-job
+├── ideal_candidate.txt              # Optional for setup-job  
+├── warning_flags.txt                # Optional for setup-job
 
 ```
 Example for `process-candidates`
 ```
 data/intake/
-├── resume_john_doe.pdf              # Required for --process-candidates
-├── coverletter_john_doe.pdf         # Optional for --process-candidates
-└── application_john_doe.txt         # Optional for --process-candidates
+├── resume_john_doe.pdf              # Required for process-candidates
+├── coverletter_john_doe.pdf         # Optional for process-candidates
+└── application_john_doe.txt         # Optional for process-candidates
 ...
-├── resume_jane_doe.pdf              # Required for --process-candidates
-└── application_jane_doe.txt         # Optional for --process-candidates
+├── resume_jane_doe.pdf              # Required for process-candidates
+└── application_jane_doe.txt         # Optional for process-candidates
 ...
 ```
 
