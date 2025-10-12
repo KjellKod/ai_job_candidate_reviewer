@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -38,6 +39,7 @@ class CandidateReviewer:
             config: Configuration object
         """
         self.config = config
+        # Initialize AI connectivity and components
         if config.openai_api_key:
             # Test connection and get best model
             connection_tester = OpenAIConnectionTester(
@@ -59,6 +61,47 @@ class CandidateReviewer:
         self.feedback_manager = (
             FeedbackManager(config, self.ai_client) if self.ai_client else None
         )
+
+    def _create_backup_zip(self, items: List[Path], label: str) -> Optional[Path]:
+        """Create a timestamped zip backup of provided items under base backups.
+
+        Args:
+            items: Files or directories to include in the backup
+            label: Short label to include in filename for context
+
+        Returns:
+            Path to created zip file, or None on failure
+        """
+        try:
+            base_dir = Path(self.config.base_data_path)
+            backups_dir = base_dir / "backups"
+            backups_dir.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            zip_path = backups_dir / f"{timestamp}.{label}.zip"
+
+            def relative_arcname(p: Path) -> str:
+                try:
+                    return str(p.relative_to(base_dir))
+                except ValueError:
+                    return p.name
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for item in items:
+                    if not item.exists():
+                        continue
+                    if item.is_dir():
+                        for root, _dirs, files in os.walk(item):
+                            for f in files:
+                                fp = Path(root) / f
+                                zf.write(fp, relative_arcname(fp))
+                    else:
+                        zf.write(item, relative_arcname(item))
+
+            return zip_path
+        except Exception as exc:
+            print(f"   ❌ Backup failed: {exc}")
+            return None
 
     def _print_model_info(self, operation: str) -> None:
         """Print current model information for an operation.
@@ -1289,6 +1332,13 @@ class CandidateReviewer:
         try:
             confirm = input("\nRemove these files? (y/N): ").strip().lower()
             if confirm in ["y", "yes"]:
+                # Create a backup before deletion
+                backup = self._create_backup_zip(candidate_files, "clean_intake")
+                if backup:
+                    print(f"   📦 Backup created: {backup}")
+                else:
+                    print("   ⚠️  Proceeding without backup (creation failed)")
+
                 removed = 0
                 for file_path in candidate_files:
                     try:
@@ -1365,8 +1415,16 @@ class CandidateReviewer:
                 .lower()
             )
             if confirm in ["y", "yes"]:
+                # Backup candidates and reports before deletion
+                backup_items = [p for _, p in items_to_remove]
+                backup = self._create_backup_zip(backup_items, f"reset_{job_name}")
+                if backup:
+                    print(f"   📦 Backup created: {backup}")
+                else:
+                    print("   ⚠️  Proceeding without backup (creation failed)")
+
                 removed = 0
-                for item_type, item_path in items_to_remove:
+                for _item_type, item_path in items_to_remove:
                     try:
                         if item_path.is_dir():
                             import shutil
