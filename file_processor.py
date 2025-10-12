@@ -107,7 +107,10 @@ class FileProcessor:
                     )
                     if confirm not in ["y", "yes"]:
                         errors.append(
-                            "Processing cancelled by user. Please fix unrecognized files."
+                            (
+                                "Processing cancelled by user. "
+                                "Please fix unrecognized files."
+                            )
                         )
                         return candidates, errors
                 except KeyboardInterrupt:
@@ -124,7 +127,11 @@ class FileProcessor:
         if not candidate_files:
             errors.append("No candidate files found in intake directory.")
             errors.append(
-                "Expected naming: resume_firstname_lastname.pdf, coverletter_firstname_lastname.pdf, application_firstname_lastname.txt"
+                (
+                    "Expected naming: resume_firstname_lastname.pdf, "
+                    "coverletter_firstname_lastname.pdf, "
+                    "application_firstname_lastname.txt"
+                )
             )
             return candidates, errors
 
@@ -498,7 +505,6 @@ class FileProcessor:
 
         for prefix in expected_prefixes:
             # Check similarity with the start of filename
-            prefix_len = len(prefix) - 1  # Remove the underscore for comparison
             filename_start = filename.split("_")[
                 0
             ].lower()  # Get first part before underscore
@@ -506,7 +512,7 @@ class FileProcessor:
 
             ratio = difflib.SequenceMatcher(None, prefix_base, filename_start).ratio()
 
-            # print(f"   DEBUG: {prefix_base} vs {filename_start} = {ratio:.2f}")  # Debug disabled
+            # print("   DEBUG: {} vs {} = {:.2f}".format(prefix_base, filename_start, ratio))  # Debug disabled
 
             if ratio > best_ratio and ratio > 0.6:  # 60% similarity threshold
                 best_match = prefix
@@ -520,7 +526,7 @@ class FileProcessor:
             )
             suggested_name = f"{best_match}{name_part}{file_extension}"
 
-            print(f"\n🤔 Possible typo detected:")
+            print("\n🤔 Possible typo detected:")
             print(f"   Found: {filename}")
             print(f"   Suggested: {suggested_name}")
             print(f"   Confidence: {best_ratio:.1%}")
@@ -581,7 +587,8 @@ class FileProcessor:
 
         - Supports prefix and suffix styles for filenames
         - If multiple files of the same type exist, select the NEWEST by mtime
-        - If different uploads contain complementary files (e.g., resume + application), merge them
+        - If different uploads contain complementary files 
+          (e.g., resume + application), merge them
 
         Args:
             candidate_files: Dictionary mapping file paths to detected file type
@@ -647,7 +654,8 @@ class FileProcessor:
             if duplicates_detected.get(candidate_name):
                 merged_types = ", ".join(sorted(duplicates_detected[candidate_name]))
                 print(
-                    f"🔁 Merged duplicates for {candidate_name}: {merged_types} (kept newest by modified time)"
+                    f"🔁 Merged duplicates for {candidate_name}: {merged_types} "
+                    f"(kept newest by modified time)"
                 )
 
         return result

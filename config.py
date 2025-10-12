@@ -24,7 +24,8 @@ class Config:
         """Initialize configuration.
 
         Args:
-            env_file: Optional path to .env file. If None, looks for .env in current directory.
+            env_file: Optional path to .env file. If None, looks for .env in 
+                current directory.
         """
         self.env_file = env_file or ".env"
         self.load_env()
@@ -107,7 +108,10 @@ class Config:
             )
         elif not self.openai_api_key.startswith(("sk-", "sk-proj-")):
             warnings.append(
-                "OPENAI_API_KEY format looks unusual. Expected to start with 'sk-' or 'sk-proj-'."
+                (
+                    "OPENAI_API_KEY format looks unusual. Expected to start with "
+                    "'sk-' or 'sk-proj-'."
+                )
             )
 
         # Validate file size limit
@@ -115,7 +119,10 @@ class Config:
             errors.append("MAX_FILE_SIZE_MB must be greater than 0.")
         elif self.max_file_size_mb > 10:
             warnings.append(
-                f"MAX_FILE_SIZE_MB is set to {self.max_file_size_mb}MB. Large files may cause memory issues."
+                (
+                    f"MAX_FILE_SIZE_MB is set to {self.max_file_size_mb}MB. "
+                    f"Large files may cause memory issues."
+                )
             )
 
         # Check if paths are writable

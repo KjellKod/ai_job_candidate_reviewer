@@ -149,7 +149,10 @@ class CandidateReviewer:
             return JobSetupResult(
                 success=True,
                 job_name=job_name,
-                message=f"Job '{job_name}' {'updated' if job_path.exists() else 'setup'} successfully",
+                message=(
+                    f"Job '{job_name}' {'updated' if job_path.exists() else 'setup'} "
+                    f"successfully"
+                ),
                 job_context=job_context,
             )
 
@@ -209,7 +212,10 @@ class CandidateReviewer:
                     job_name=job_name,
                     message="Job description file is required",
                     errors=[
-                        "Use -j /path/to/job_description.pdf or place job_description.pdf in intake/"
+                        (
+                            "Use -j /path/to/job_description.pdf or place "
+                            "job_description.pdf in intake/"
+                        )
                     ],
                 )
 
@@ -246,7 +252,10 @@ class CandidateReviewer:
             return JobSetupResult(
                 success=True,
                 job_name=job_name,
-                message=f"Job '{job_name}' {'updated' if job_path.exists() else 'setup'} successfully from direct paths",
+                message=(
+                    f"Job '{job_name}' {'updated' if job_path.exists() else 'setup'} "
+                    f"successfully from direct paths"
+                ),
                 job_context=job_context,
             )
 
@@ -358,7 +367,7 @@ class CandidateReviewer:
             csv_path = self.output_generator.generate_csv(
                 all_evaluations, output_path, job_name
             )
-            html_path = self.output_generator.generate_html_report(
+            self.output_generator.generate_html_report(
                 job_context, all_evaluations, output_path
             )
 
@@ -436,7 +445,10 @@ class CandidateReviewer:
                     job_name=job_name,
                     message="No candidate files found in intake",
                     errors=[
-                        "Place candidate files in intake directory with naming: resume_firstname_lastname.pdf"
+                        (
+                            "Place candidate files in intake directory with naming: "
+                            "resume_firstname_lastname.pdf"
+                        )
                     ],
                 )
 
@@ -467,8 +479,10 @@ class CandidateReviewer:
                             evaluations=evaluations,
                             errors=all_errors,
                             message=(
-                                f"Stopped at candidate '{candidate_files.candidate_name}' due to missing/invalid files. "
-                                "Fix the candidate files or remove the candidate, then retry."
+                                f"Stopped at candidate '{candidate_files.candidate_name}' "
+                                f"due to missing/invalid files. "
+                                f"Fix the candidate files or remove the candidate, "
+                                f"then retry."
                             ),
                         )
 
@@ -499,7 +513,9 @@ class CandidateReviewer:
                         if attempt < max_retries:
                             wait = backoff_seconds**attempt
                             print(
-                                f"⏳ Transient API error for {candidate.name}. Retrying in {wait}s (attempt {attempt}/{max_retries-1})..."
+                                f"⏳ Transient API error for {candidate.name}. "
+                                f"Retrying in {wait}s "
+                                f"(attempt {attempt}/{max_retries-1})..."
                             )
                             time.sleep(wait)
 
@@ -515,7 +531,8 @@ class CandidateReviewer:
 
                     if has_api_issue:
                         all_errors.append(
-                            f"{candidate_files.candidate_name}: Transient API error - not processed. Please retry."
+                            f"{candidate_files.candidate_name}: "
+                            f"Transient API error - not processed. Please retry."
                         )
                         failed_candidates.append(candidate_files.candidate_name)
                         continue
@@ -530,7 +547,8 @@ class CandidateReviewer:
                     evaluations.append(evaluation)
                     processed_candidates.append(candidate.name)
                     print(
-                        f"✅ Processed: {candidate.name} (Score: {evaluation.overall_score}/100)"
+                        f"✅ Processed: {candidate.name} "
+                        f"(Score: {evaluation.overall_score}/100)"
                     )
 
                 except Exception as e:
@@ -554,11 +572,14 @@ class CandidateReviewer:
                 csv_path = self.output_generator.generate_csv(
                     all_evaluations, output_path, job_name
                 )
-                html_path = self.output_generator.generate_html_report(
+                self.output_generator.generate_html_report(
                     job_context, all_evaluations, output_path
                 )
 
-                success_msg = f"Processed {len(processed_candidates)} candidates. Results saved to {csv_path}"
+                success_msg = (
+                    f"Processed {len(processed_candidates)} candidates. "
+                    f"Results saved to {csv_path}"
+                )
             else:
                 success_msg = "No candidates were successfully processed"
 
@@ -750,13 +771,14 @@ class CandidateReviewer:
             # Auto-add corrections for common issues
             if "english" in feedback_lower or "grammar" in feedback_lower:
                 corrections["concerns"] = (
-                    f"{', '.join(evaluation.concerns)}, Poor written English with grammatical mistakes"
+                    f"{', '.join(evaluation.concerns)}, "
+                    f"Poor written English with grammatical mistakes"
                 )
                 corrections["overall_score"] = str(human_score)
 
         else:
             # Interactive feedback collection
-            print(f"\n🤔 Please provide your feedback:")
+            print("\n🤔 Please provide your feedback:")
 
             # Get human recommendation
             print("\nWhat is your recommendation for this candidate?")
@@ -788,7 +810,7 @@ class CandidateReviewer:
             # Get human score (optional)
             human_score = None
             score_input = input(
-                f"\nOptional: Provide a score 0-100 (or press Enter to skip): "
+                "\nOptional: Provide a score 0-100 (or press Enter to skip): "
             ).strip()
             if score_input:
                 try:
@@ -797,14 +819,14 @@ class CandidateReviewer:
                     print("Invalid score, skipping...")
 
             # Get feedback notes
-            feedback_notes = input(f"\nPlease explain your reasoning: ").strip()
+            feedback_notes = input("\nPlease explain your reasoning: ").strip()
             if not feedback_notes:
                 feedback_notes = "No additional notes provided"
 
             # Get specific corrections
             corrections = {}
             print(
-                f"\nAny specific corrections to the AI evaluation? (press Enter when done)"
+                "\nAny specific corrections to the AI evaluation? (press Enter when done)"
             )
             print("Format: field_name: corrected_value")
             print("Example: overall_score: 65")
@@ -837,7 +859,7 @@ class CandidateReviewer:
         # Save feedback
         try:
             self.feedback_manager.collect_feedback(job_name, candidate_name, feedback)
-            print(f"\n✅ Feedback saved successfully!")
+            print("\n✅ Feedback saved successfully!")
         except Exception as e:
             print(f"\n❌ Error saving feedback: {e}")
 
@@ -873,7 +895,7 @@ class CandidateReviewer:
                 agreement_rate = insights.effectiveness_metrics.get("agreement_rate", 0)
                 print(f"Agreement rate: {agreement_rate:.1%}")
 
-            print(f"\n📝 Generated Insights:")
+            print("\n📝 Generated Insights:")
 
             def _print_value(value, indent_level: int = 2) -> None:
                 indent = " " * indent_level
@@ -923,7 +945,7 @@ class CandidateReviewer:
             self.feedback_manager.trigger_re_evaluation(job_name, candidate_names)
 
             # Show updated rankings after re-evaluation
-            print(f"\n📊 Updated candidate rankings:")
+            print("\n📊 Updated candidate rankings:")
             self.show_candidates(job_name)
 
         except Exception as e:
@@ -984,39 +1006,35 @@ class CandidateReviewer:
             print(f"❌ No reports found for job '{job_name}'")
             return
 
-        print(f"📊 Available reports for '{job_name}':")
+        print("📊 Available reports for '{}':".format(job_name))
 
         # List CSV files
         csv_files = list(output_path.glob("candidate_scores_*.csv"))
         if csv_files:
-            print(f"\n📈 CSV Reports:")
+            print("\n📈 CSV Reports:")
             for csv_file in sorted(
                 csv_files, key=lambda f: f.stat().st_mtime, reverse=True
             ):
                 mtime = csv_file.stat().st_mtime
-                from datetime import datetime
-
                 date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
                 print(f"   • {csv_file.name} ({date_str})")
 
         # List HTML files
         html_files = list(output_path.glob("detailed_report_*.html"))
         if html_files:
-            print(f"\n🌐 HTML Reports:")
+            print("\n🌐 HTML Reports:")
             for html_file in sorted(
                 html_files, key=lambda f: f.stat().st_mtime, reverse=True
             ):
                 mtime = html_file.stat().st_mtime
-                from datetime import datetime
-
                 date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
                 print(f"   • {html_file.name} ({date_str})")
 
         # Show feedback summary if exists
         feedback_file = output_path / "feedback_summary.json"
         if feedback_file.exists():
-            print(f"\n💬 Feedback Summary:")
-            print(f"   • feedback_summary.json")
+            print("\n💬 Feedback Summary:")
+            print("   • feedback_summary.json")
 
         print(f"\n📂 Full path: {output_path}")
 
@@ -1192,12 +1210,12 @@ class CandidateReviewer:
             return
 
         print(f"🗑️  Found {len(items_to_remove)} items to remove for job '{job_name}':")
-        print(f"\n📋 WILL KEEP (Job Setup & Learning):")
-        print(f"   ✅ Job description, ideal candidate, warning flags")
-        print(f"   ✅ AI insights from feedback (data/jobs/{job_name}/insights.json)")
-        print(f"   ✅ Feedback summary (data/output/{job_name}/feedback_summary.json)")
+        print("\n📋 WILL KEEP (Job Setup & Learning):")
+        print("   ✅ Job description, ideal candidate, warning flags")
+        print("   ✅ AI insights from feedback (data/jobs/{}/insights.json)".format(job_name))
+        print("   ✅ Feedback summary (data/output/{}/feedback_summary.json)".format(job_name))
 
-        print(f"\n🗑️  WILL DELETE (Candidates & Reports):")
+        print("\n🗑️  WILL DELETE (Candidates & Reports):")
         for item_type, item_path in items_to_remove:
             if item_type == "candidate":
                 print(f"   🧑 Candidate: {item_path.name}")
@@ -1228,8 +1246,8 @@ class CandidateReviewer:
                 print(
                     f"\n🎉 Reset complete! Removed {removed}/{len(items_to_remove)} items"
                 )
-                print(f"✅ Job setup and AI insights preserved")
-                print(f"✅ Ready for new candidates")
+                print("✅ Job setup and AI insights preserved")
+                print("✅ Ready for new candidates")
             else:
                 print("❌ Reset cancelled")
         except KeyboardInterrupt:

@@ -1,7 +1,6 @@
 """Feedback management for AI Job Candidate Reviewer."""
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -83,7 +82,8 @@ class FeedbackManager:
 
         if len(feedback_records) < 2:
             print(
-                f"⚠️  Need at least 2 feedback records to generate insights (have {len(feedback_records)})"
+                f"⚠️  Need at least 2 feedback records to generate insights "
+                f"(have {len(feedback_records)})"
             )
             return None
 
@@ -172,7 +172,8 @@ class FeedbackManager:
                             feedback_records.append(record)
                     except (json.JSONDecodeError, KeyError) as e:
                         print(
-                            f"Warning: Could not load feedback for {candidate_dir.name}: {e}"
+                            f"Warning: Could not load feedback for "
+                            f"{candidate_dir.name}: {e}"
                         )
 
         return feedback_records
@@ -230,7 +231,8 @@ class FeedbackManager:
                 re_evaluated.append(candidate_name)
 
                 print(
-                    f"✅ Re-evaluated {candidate_name} (Score: {evaluation.overall_score}/100)"
+                    f"✅ Re-evaluated {candidate_name} "
+                    f"(Score: {evaluation.overall_score}/100)"
                 )
 
         if re_evaluated:
@@ -266,7 +268,7 @@ class FeedbackManager:
                         job_context, evaluations, output_path
                     )
 
-                    print(f"\n📊 Updated reports generated:")
+                    print("\n📊 Updated reports generated:")
                     print(f"   📈 CSV: {csv_path}")
                     print(f"   🌐 HTML: {html_path}")
 
@@ -302,8 +304,12 @@ class FeedbackManager:
             {
                 "candidate_name": feedback_record.candidate_name,
                 "timestamp": feedback_record.human_feedback.timestamp.isoformat(),
-                "human_recommendation": feedback_record.human_feedback.human_recommendation.value,
-                "ai_recommendation": feedback_record.original_evaluation.recommendation.value,
+                "human_recommendation": (
+                    feedback_record.human_feedback.human_recommendation.value
+                ),
+                "ai_recommendation": (
+                    feedback_record.original_evaluation.recommendation.value
+                ),
             }
         )
         summary["last_updated"] = datetime.now().isoformat()

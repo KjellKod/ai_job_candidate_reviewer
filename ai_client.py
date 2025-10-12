@@ -54,7 +54,11 @@ class AIClient:
                 [
                     {
                         "role": "system",
-                        "content": "You are an expert HR professional evaluating job candidates. Provide thorough, fair, and structured evaluations.",
+                        "content": (
+                            "You are an expert HR professional evaluating job "
+                            "candidates. Provide thorough, fair, and structured "
+                            "evaluations."
+                        ),
                     },
                     {"role": "user", "content": prompt},
                 ]
@@ -70,7 +74,10 @@ class AIClient:
                     strengths=[],
                     concerns=[f"API Error: {response.error_message}"],
                     interview_priority=InterviewPriority.LOW,
-                    detailed_notes=f"Evaluation failed due to API error: {response.error_message}",
+                    detailed_notes=(
+                        f"Evaluation failed due to API error: "
+                        f"{response.error_message}"
+                    ),
                     ai_insights_used=job_insights,
                 )
 
@@ -126,7 +133,10 @@ class AIClient:
                 [
                     {
                         "role": "system",
-                        "content": "You are an AI learning system that generates insights from human feedback to improve candidate evaluations.",
+                        "content": (
+                            "You are an AI learning system that generates insights "
+                            "from human feedback to improve candidate evaluations."
+                        ),
                     },
                     {"role": "user", "content": prompt},
                 ]
@@ -137,7 +147,9 @@ class AIClient:
             else:
                 return json.dumps(
                     {
-                        "evaluation_criteria_refinements": "Unable to generate insights due to API error",
+                        "evaluation_criteria_refinements": (
+                            "Unable to generate insights due to API error"
+                        ),
                         "strength_identification_patterns": "Error occurred",
                         "concern_identification_patterns": "Error occurred",
                         "scoring_calibration": "Error occurred",
@@ -148,7 +160,9 @@ class AIClient:
         except Exception as e:
             return json.dumps(
                 {
-                    "evaluation_criteria_refinements": f"Error generating insights: {str(e)}",
+                    "evaluation_criteria_refinements": (
+                        f"Error generating insights: {str(e)}"
+                    ),
                     "strength_identification_patterns": "Error occurred",
                     "concern_identification_patterns": "Error occurred",
                     "scoring_calibration": "Error occurred",
@@ -241,7 +255,8 @@ class AIClient:
             insights_section = f"""
 AI INSIGHTS FROM PREVIOUS FEEDBACK:
 {job_insights}
-Note: These insights were generated from human feedback on previous evaluations for this role.
+Note: These insights were generated from human feedback on previous 
+evaluations for this role.
 """
 
         return f"""You are evaluating job candidates. Analyze the following:
@@ -268,7 +283,8 @@ Provide evaluation in this exact JSON format:
   "concerns": ["concern1", "concern2"],
   "interview_priority": "HIGH|MEDIUM|LOW",
   "detailed_notes": "comprehensive evaluation",
-  "insights_applied": "which specific insights influenced this evaluation (or null if none)"
+  "insights_applied": "which specific insights influenced this evaluation "
+                      "(or null if none)"
 }}"""
 
     def _build_insights_prompt(
