@@ -24,8 +24,7 @@ def check_dependencies():
         "python-dotenv",
         "click",
         "pydantic",
-        "PyPDF2",
-        "python-magic",
+        "pypdf",
     ]
 
     missing = []
@@ -35,10 +34,6 @@ def check_dependencies():
             import_name = package
             if package == "python-dotenv":
                 import_name = "dotenv"
-            elif package == "python-magic":
-                import_name = "magic"
-            elif package == "PyPDF2":
-                import_name = "PyPDF2"
 
             importlib.import_module(import_name)
             print(f"✅ {package}")
