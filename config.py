@@ -192,10 +192,10 @@ class Config:
         from pathlib import Path
 
         candidate_path = Path(self.get_candidate_path(job_name, candidate_name))
-        
+
         if not candidate_path.exists() or not candidate_path.is_dir():
             return False
-        
+
         # Check if directory contains any files
         try:
             return any(candidate_path.iterdir())
@@ -215,10 +215,10 @@ class Config:
         from pathlib import Path
 
         candidates_path = Path(self.candidates_path) / job_name
-        
+
         if not candidates_path.exists():
             return []
-        
+
         try:
             return [
                 candidate_dir.name

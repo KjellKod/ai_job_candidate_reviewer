@@ -615,13 +615,13 @@ class FileProcessor:
 
     def extract_candidate_name_from_filename(self, file_path: str) -> Optional[str]:
         """Extract candidate name from filename using various naming patterns.
-        
+
         This is a public API method that can be used by other components
         to extract candidate names from file paths or filenames.
-        
+
         Args:
             file_path: Path to the candidate file or just the filename
-            
+
         Returns:
             Extracted candidate name or None if extraction fails
         """
