@@ -26,7 +26,7 @@ Add these **Repository Secrets**:
 | Secret Name | Description | Example Value | Required |
 |-------------|-------------|---------------|----------|
 | `OPENAI_API_KEY` | Your OpenAI API key | `sk-proj-abc123...` | Optional* |
-| `OPENAI_MODEL` | Preferred OpenAI model | `gpt-4` or `gpt-3.5-turbo` | Optional |
+| `OPENAI_MODEL` | Preferred OpenAI model | `gpt-5`, `gpt-4`, `gpt-3.5-turbo` | Optional (auto-selects best) |
 
 *Only required if you want real API integration tests
 

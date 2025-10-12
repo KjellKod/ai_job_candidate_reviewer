@@ -17,11 +17,14 @@ class TestConfig:
         """Test default path configuration."""
         config = Config()
 
-        assert config.base_data_path == "./data"
-        assert config.intake_path == "./data/intake"
-        assert config.jobs_path == "./data/jobs"
-        assert config.candidates_path == "./data/candidates"
-        assert config.output_path == "./data/output"
+        # Get base path from environment or use default
+        expected_base = os.getenv("BASE_DATA_PATH", "./data")
+
+        assert config.base_data_path == expected_base
+        assert config.intake_path == f"{expected_base}/intake"
+        assert config.jobs_path == f"{expected_base}/jobs"
+        assert config.candidates_path == f"{expected_base}/candidates"
+        assert config.output_path == f"{expected_base}/output"
         assert config.max_file_size_mb == 2
         assert config.max_file_size_bytes == 2 * 1024 * 1024
 

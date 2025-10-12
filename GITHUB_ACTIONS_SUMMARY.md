@@ -18,7 +18,7 @@ If you want to test against the real OpenAI API, you can optionally add:
 ```yaml
 # In GitHub Repository → Settings → Secrets and variables → Actions
 OPENAI_API_KEY: sk-proj-your-real-api-key-here
-OPENAI_MODEL: gpt-4  # Optional, defaults to gpt-4
+OPENAI_MODEL: gpt-5  # Optional, auto-selects best available (gpt-5 → gpt-4)
 ```
 
 ## 📋 Complete CI/CD Pipeline Features

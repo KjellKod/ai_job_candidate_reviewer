@@ -71,6 +71,57 @@ python3 candidate_reviewer.py open-reports "mobile_engineer"
 - ✅ **Less errors** - can't typo file paths
 
 
+## Environment Configuration
+
+### Required: OpenAI API Key
+
+Create a `.env` file in the project root with your OpenAI API key:
+
+```bash
+OPENAI_API_KEY=sk-proj-your-api-key-here
+```
+
+Get your API key from: https://platform.openai.com/api-keys
+
+### Optional: Data Storage Path
+
+By default, all data is stored in `./data/`. You can customize this with environment variables:
+
+```bash
+# Change base data directory (useful for testing or custom storage)
+BASE_DATA_PATH=./custom_data
+
+# Or override individual paths
+INTAKE_PATH=./my_intake
+JOBS_PATH=./my_jobs
+CANDIDATES_PATH=./my_candidates
+OUTPUT_PATH=./my_output
+```
+
+**Directory Structure:**
+
+The application automatically creates these subdirectories if they don't exist:
+
+```
+{BASE_DATA_PATH}/          # Default: ./data
+├── intake/                # Drop files here for processing
+├── jobs/                  # Processed job descriptions (auto-created)
+├── candidates/            # Processed candidate files (auto-created)
+└── output/                # Generated reports (auto-created)
+```
+
+**You only need to create the base directory** (e.g., `mkdir data` or `mkdir custom_data`). The subdirectories are created automatically when you run commands.
+
+**Common use cases:**
+- **Testing:** `BASE_DATA_PATH=./test_data` (keeps test data separate)
+- **Production:** `BASE_DATA_PATH=/var/app/data` (system-wide storage)
+- **Development:** `BASE_DATA_PATH=./data_dev` (separate dev environment)
+
+**Note:** These are optional. For normal use, just set `OPENAI_API_KEY` and use the default `./data/` directory.
+
+For more configuration options, see `CONFIGURATION.md`.
+
+
 ## File Organization
 
 **1. Drop files here:**

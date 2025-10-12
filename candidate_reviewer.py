@@ -1462,6 +1462,9 @@ def cli(ctx):
     # Initialize configuration
     config = Config()
 
+    # Show data path configuration
+    click.echo(f"📁 Data directory: {config.base_data_path}")
+
     # Validate configuration
     validation = config.validate_required_settings()
 

@@ -34,6 +34,9 @@ echo ""
 
 # 4. Run all tests
 echo "4️⃣  Running test suite..."
+# Create test data directory if it doesn't exist (for local testing)
+mkdir -p test_data/{intake,jobs,candidates,output}
+export BASE_DATA_PATH=./test_data
 python3 -m pytest tests/ -v --tb=short || { echo "❌ Tests failed"; exit 1; }
 echo "✅ All tests passed"
 echo ""
