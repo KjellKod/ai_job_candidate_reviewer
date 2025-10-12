@@ -94,9 +94,10 @@ python3 candidate_reviewer.py setup-job "senior_engineer"
 
 ```bash
 # Drop candidate files into data/intake/:
-# - resume_john_doe.pdf
-# - coverletter_john_doe.pdf (optional)
-# - application_john_doe.txt (optional)
+# Flexible naming - prefix OR suffix style both work:
+# - resume_john_doe.pdf  OR  john_doe_resume.pdf
+# - coverletter_john_doe.pdf  OR  john_doe_coverletter.pdf (optional)
+# - application_john_doe.txt  OR  john_doe_application.txt (optional)
 
 # Process them
 python3 candidate_reviewer.py process-candidates "senior_engineer"
