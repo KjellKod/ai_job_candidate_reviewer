@@ -99,14 +99,20 @@ class OutputGenerator:
 
         print(f"\n🎯 Candidate Rankings for: {job_name}")
         print("=" * 80)
-        
+
         # Add explanatory header
         print("\n📊 How to Read the Results:")
         print("   Score: [0-100] | [RECOMMENDATION] | [🔥📋📝] [INTERVIEW PRIORITY]")
         print("")
-        print("   \033[92mSTRONG_YES\033[0m = Great catch         🔥 HIGH = Interview ASAP")
-        print("   \033[94mYES\033[0m = Consider hiring            📋 MEDIUM = Not sure. Review again before deciding") 
-        print("   \033[93mMAYBE\033[0m = Consider carefully       📝 LOW = Likely not worth interviewing. Too many red flags")
+        print(
+            "   \033[92mSTRONG_YES\033[0m = Great catch         🔥 HIGH = Interview ASAP"
+        )
+        print(
+            "   \033[94mYES\033[0m = Consider hiring            📋 MEDIUM = Not sure. Review again before deciding"
+        )
+        print(
+            "   \033[93mMAYBE\033[0m = Consider carefully       📝 LOW = Likely not worth interviewing. Too many red flags"
+        )
         print("   \033[91mNO\033[0m/\033[95mSTRONG_NO\033[0m = Don't recommend")
         print("=" * 80)
 
