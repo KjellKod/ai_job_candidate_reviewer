@@ -1,36 +1,36 @@
-# 🤖 AI Job Candidate Reviewer
+# AI Job Candidate Reviewer
 
 > **Stop spending hours manually screening resumes. Let AI do the first pass.**
 
 Transform your hiring workflow with AI-powered resume screening that's fast, consistent, and adapts to your preferences.
 
-## 🎯 Why This Matters
+## Why This Matters
 
 Recruiting at scale is **painful**:
-- ⏰ **Time-consuming** - Hours spent reading similar resumes
-- 🎲 **Inconsistent** - Different standards across reviewers or days
-- 😓 **Draining** - Mental fatigue from repetitive evaluation
+- **Time-consuming** - Hours spent reading similar resumes
+- **Inconsistent** - Different standards across reviewers or days
+- **Draining** - Mental fatigue from repetitive evaluation
 
 **This tool changes that:**
 
-✨ **Drop files, get rankings** - No complex setup, just organized folders  
-🎯 **Consistent evaluations** - Same criteria applied to every candidate  
-📊 **Detailed insights** - Scores, strengths, concerns, and interview priorities  
-🔄 **Gets smarter** - Learns from your feedback to match your preferences  
-🚀 **Powered by GPT-5** - Latest AI models with automatic fallback
+**Drop files, get rankings** - No complex setup, just organized folders  
+**Consistent evaluations** - Same criteria applied to every candidate  
+**Detailed insights** - Scores, strengths, concerns, and interview priorities  
+**Gets smarter** - Learns from your feedback to match your preferences  
+**Powered by GPT-5** - Latest AI models with automatic fallback
 
 ```
 Drop Files → AI Analysis → Ranked Results → Your Feedback → Improved Rankings
 ```
 
-## ✨ Key Features
+## Key Features
 
-- 🎯 **Structured evaluations** with scores (0-100) and recommendations
-- 📈 **Interview priorities** (HIGH/MEDIUM/LOW) to focus your time
-- 💡 **AI learning** from your feedback improves future screenings
-- 📄 **Multiple formats** - CSV reports and HTML summaries
-- 🔒 **Privacy-first** - All data stays local, only candidate content goes to OpenAI
-- ⚡ **Fast** - Process multiple candidates in seconds
+- **Structured evaluations** with scores (0-100) and recommendations
+- **Interview priorities** (HIGH/MEDIUM/LOW) to focus your time
+- **AI learning** from your feedback improves future screenings
+- **Multiple formats** - CSV reports and HTML summaries
+- **Privacy-first** - All data stays local, only candidate content goes to OpenAI
+- **Fast** - Process multiple candidates in seconds
 
 ## 🚀 5-Minute Setup
 
@@ -53,26 +53,26 @@ python3 candidate_reviewer.py test-connection
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
 **Getting Started:**
-- [Quick Start Guide](#-quick-start-guide) - Get up and running fast
-- [How It Works](#-how-it-works) - Visual workflow diagram
-- [Environment Configuration](#-environment-configuration) - API keys and data paths
+- [Quick Start Guide](#quick-start-guide) - Get up and running fast
+- [How It Works](#how-it-works) - Visual workflow diagram
+- [Environment Configuration](#environment-configuration) - API keys and data paths
 
 **Using the Tool:**
-- [File Organization](#-file-organization) - How files are structured
-- [All Commands](#-all-commands) - Complete command reference
-- [Results & Reports](#-results--reports) - Understanding the output
+- [File Organization](#file-organization) - How files are structured
+- [All Commands](#all-commands) - Complete command reference
+- [Results & Reports](#results--reports) - Understanding the output
 
 **Going Further:**
-- [Advanced Features](#-advanced-improve-results) - Fine-tune AI behavior
-- [Troubleshooting](#-troubleshooting) - Common issues
-- [Additional Resources](#-additional-resources) - Detailed guides
+- [Advanced Features](#advanced-improve-results) - Fine-tune AI behavior
+- [Troubleshooting](#troubleshooting) - Common issues
+- [Additional Resources](#additional-resources) - Detailed guides
 
 ---
 
-## 🎬 Quick Start Guide
+## Quick Start Guide
 
 ### Step 1: Setup a Job (once per position)
 
@@ -126,7 +126,7 @@ python3 candidate_reviewer.py re-evaluate "senior_engineer"
 
 ---
 
-## 🎨 How It Works
+## How It Works
 
 ### Visual Workflow
 
@@ -164,17 +164,17 @@ flowchart TD
 
 ### Simple Explanation
 
-1. **📥 Drop Files** → You organize files by name (no complex paths)
-2. **🤖 AI Analyzes** → GPT-5 reads and evaluates each candidate
-3. **📊 Get Rankings** → Receive scores, recommendations, priorities
-4. **💡 Teach AI** → Give feedback, AI adapts to your preferences
-5. **🔄 Improve** → Re-evaluate with smarter AI
+1. **Drop Files** → You organize files by name (no complex paths)
+2. **AI Analyzes** → GPT-5 reads and evaluates each candidate
+3. **Get Rankings** → Receive scores, recommendations, priorities
+4. **Teach AI** → Give feedback, AI adapts to your preferences
+5. **Improve** → Re-evaluate with smarter AI
 
 **Key Benefits:**
-- ⏱️ **Fast** - Process 10 candidates in seconds
-- 🎯 **Consistent** - Same criteria for everyone
-- 🧠 **Smart** - Learns your preferences over time
-- 📈 **Structured** - Clear scores and priorities
+- **Fast** - Process 10 candidates in seconds
+- **Consistent** - Same criteria for everyone
+- **Smart** - Learns your preferences over time
+- **Structured** - Clear scores and priorities
 
 ---
 
@@ -189,7 +189,7 @@ flowchart TD
 
 ---
 
-## 🔧 Environment Configuration
+## Environment Configuration
 
 ### Required: OpenAI API Key
 
@@ -241,7 +241,7 @@ For more configuration options, see `CONFIGURATION.md`.
 
 ---
 
-## 📂 File Organization
+## File Organization
 
 **1. Drop files here:**
 
@@ -298,7 +298,7 @@ Notes:
 
 ---
 
-## 📖 All Commands
+## All Commands
 
 ### **Core Workflow:**
 ```bash
@@ -360,7 +360,7 @@ Options:
 
 ---
 
-## 📊 Results & Reports
+## Results & Reports
 
 **CSV Format:** Open `candidate_scores.csv` in Excel with:
 - **Overall Score** (0-100)
@@ -393,7 +393,7 @@ Job: senior_python_dev_2024
 
 ---
 
-## 📝 File Naming
+## File Naming
 
 **Job files:** Any names work, script auto-detects
 **Candidate files:** Include name in filename
@@ -402,7 +402,7 @@ Job: senior_python_dev_2024
 
 ---
 
-## 🎯 Advanced: Improve Results
+## Advanced: Improve Results
 
 Create a file that explains the ideal candidate: `ideal_candidate.txt`:
 ```
@@ -438,7 +438,7 @@ This way the AI can evaluate both the resume/cover letter AND the questionnaire 
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 **Common Issues:**
 
@@ -454,7 +454,7 @@ This way the AI can evaluate both the resume/cover letter AND the questionnaire 
 
 ---
 
-## 📚 Additional Resources
+## Additional Resources
 
 ### For Users
 
@@ -478,7 +478,7 @@ python3 -m isort .         # Sort imports
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Found a bug? Have an idea? Contributions are welcome!
 
@@ -492,7 +492,7 @@ See `DEVELOPMENT.md` for development setup and guidelines.
 
 ---
 
-## 📄 License
+## License
 
 MIT License - See [LICENSE](LICENSE) file for details.
 
@@ -500,13 +500,13 @@ This software is provided "as-is" for evaluation and screening assistance. The A
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Built with:
-- 🤖 OpenAI GPT-5 / GPT-4
-- 🐍 Python 3.9+
-- 📦 Click, Pydantic, pypdf
+- OpenAI GPT-5 / GPT-4
+- Python 3.9+
+- Click, Pydantic, pypdf
 
 ---
 
-**Ready to transform your hiring process?** [Get started now](#🚀-5-minute-setup) 🚀
+**Ready to transform your hiring process?** [Get started now](#5-minute-setup)
