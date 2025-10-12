@@ -600,97 +600,179 @@ class FileProcessor:
         duplicates_detected: Dict[str, set] = {}
 
         for file_path, file_type in candidate_files.items():
-            filename = Path(file_path).name
-            name_no_ext = filename.rsplit(".", 1)[0]
-            parts = name_no_ext.split("_")
-            if len(parts) < 2:
+            candidate_name = self._extract_candidate_name_from_filename(file_path)
+            if not candidate_name:
                 continue
 
-            type_aliases = {
-                "resume",
-                "coverletter",
-                "cover",
-                "cover_letter",
-                "application",
-                "questionnaire",
-            }
+            candidate_name = self._normalize_candidate_name(candidate_name, file_path)
+            norm_type = self._normalize_file_type(file_type)
 
-            # Extract candidate name with improved logic
-            candidate_name = None
+            self._handle_duplicate_files(
+                candidates, duplicates_detected, candidate_name, norm_type, file_path
+            )
 
-            if parts[0].lower() in type_aliases:
-                # Prefix style: resume_firstname_lastname.pdf
-                candidate_name = "_".join(parts[1:])
-            elif parts[-1].lower() in type_aliases:
-                # Suffix style: firstname_lastname_resume.pdf
-                candidate_name = "_".join(parts[:-1])
-            else:
-                # Check if any part is a type (handles middle positions)
-                type_indices = [
-                    i for i, part in enumerate(parts) if part.lower() in type_aliases
+        return self._format_grouping_results(candidates, duplicates_detected)
+
+    def _extract_candidate_name_from_filename(self, file_path: str) -> Optional[str]:
+        """Extract candidate name from filename using various naming patterns.
+        
+        Args:
+            file_path: Path to the candidate file
+            
+        Returns:
+            Extracted candidate name or None if extraction fails
+        """
+        filename = Path(file_path).name
+        name_no_ext = filename.rsplit(".", 1)[0]
+        parts = name_no_ext.split("_")
+        
+        if len(parts) < 2:
+            return None
+
+        type_aliases = self._get_file_type_aliases()
+        
+        # Try different naming patterns
+        if parts[0].lower() in type_aliases:
+            # Prefix style: resume_firstname_lastname.pdf
+            return "_".join(parts[1:])
+        elif parts[-1].lower() in type_aliases:
+            # Suffix style: firstname_lastname_resume.pdf
+            return "_".join(parts[:-1])
+        else:
+            # Check if any part is a type (handles middle positions)
+            type_indices = [
+                i for i, part in enumerate(parts) if part.lower() in type_aliases
+            ]
+            if type_indices:
+                # Remove all type tokens and join the rest
+                name_parts = [
+                    part for i, part in enumerate(parts) if i not in type_indices
                 ]
-                if type_indices:
-                    # Remove all type tokens and join the rest
-                    name_parts = [
-                        part for i, part in enumerate(parts) if i not in type_indices
-                    ]
-                    candidate_name = "_".join(name_parts) if name_parts else parts[0]
-                else:
-                    # No type found - assume everything after first token is name
-                    candidate_name = "_".join(parts[1:]) if len(parts) > 2 else parts[0]
-
-            # Additional normalization: clean up common issues
-            if candidate_name:
-                # Remove trailing/leading underscores
-                candidate_name = candidate_name.strip("_")
-
-                # Handle cases where type suffix wasn't caught
-                for alias in type_aliases:
-                    if candidate_name.lower().endswith(f"_{alias}"):
-                        candidate_name = candidate_name[: -len(f"_{alias}")]
-                        break
-
-                # Ensure we have a valid name
-                if not candidate_name or candidate_name.lower() in type_aliases:
-                    candidate_name = filename.rsplit(".", 1)[
-                        0
-                    ]  # Use full filename as fallback
-
-            # Normalize file_type aliases
-            if file_type in ("cover", "coverletter", "cover_letter"):
-                norm_type = "coverletter"
-            elif file_type in ("application", "questionnaire"):
-                norm_type = "application"
+                return "_".join(name_parts) if name_parts else parts[0]
             else:
-                norm_type = file_type
+                # No type found - assume everything after first token is name
+                return "_".join(parts[1:]) if len(parts) > 2 else parts[0]
 
-            if candidate_name not in candidates:
-                candidates[candidate_name] = {}
-                duplicates_detected[candidate_name] = set()
+    def _normalize_candidate_name(self, candidate_name: str, file_path: str) -> str:
+        """Normalize and clean up candidate name.
+        
+        Args:
+            candidate_name: Raw extracted candidate name
+            file_path: Original file path for fallback
+            
+        Returns:
+            Normalized candidate name
+        """
+        if not candidate_name:
+            return Path(file_path).name.rsplit(".", 1)[0]
+            
+        # Remove trailing/leading underscores
+        candidate_name = candidate_name.strip("_")
+        
+        # Handle cases where type suffix wasn't caught
+        type_aliases = self._get_file_type_aliases()
+        for alias in type_aliases:
+            if candidate_name.lower().endswith(f"_{alias}"):
+                candidate_name = candidate_name[: -len(f"_{alias}")]
+                break
+        
+        # Ensure we have a valid name
+        if not candidate_name or candidate_name.lower() in type_aliases:
+            candidate_name = Path(file_path).name.rsplit(".", 1)[0]
+            
+        return candidate_name
 
-            mtime = os.path.getmtime(file_path)
-            if norm_type not in candidates[candidate_name]:
+    def _normalize_file_type(self, file_type: str) -> str:
+        """Normalize file type aliases to standard names.
+        
+        Args:
+            file_type: Raw file type
+            
+        Returns:
+            Normalized file type
+        """
+        if file_type in ("cover", "coverletter", "cover_letter"):
+            return "coverletter"
+        elif file_type in ("application", "questionnaire"):
+            return "application"
+        else:
+            return file_type
+
+    def _handle_duplicate_files(
+        self,
+        candidates: Dict[str, Dict[str, Tuple[str, float]]],
+        duplicates_detected: Dict[str, set],
+        candidate_name: str,
+        norm_type: str,
+        file_path: str,
+    ) -> None:
+        """Handle duplicate files by keeping the newest version.
+        
+        Args:
+            candidates: Main candidates dictionary
+            duplicates_detected: Tracking dictionary for duplicates
+            candidate_name: Name of the candidate
+            norm_type: Normalized file type
+            file_path: Path to the current file
+        """
+        if candidate_name not in candidates:
+            candidates[candidate_name] = {}
+            duplicates_detected[candidate_name] = set()
+
+        mtime = os.path.getmtime(file_path)
+        
+        if norm_type not in candidates[candidate_name]:
+            candidates[candidate_name][norm_type] = (file_path, mtime)
+        else:
+            # Duplicate type - keep newest
+            existing_path, existing_mtime = candidates[candidate_name][norm_type]
+            if mtime >= existing_mtime:
                 candidates[candidate_name][norm_type] = (file_path, mtime)
-            else:
-                # Duplicate type - keep newest
-                existing_path, existing_mtime = candidates[candidate_name][norm_type]
-                if mtime >= existing_mtime:
-                    candidates[candidate_name][norm_type] = (file_path, mtime)
-                # Record that we merged this type
-                duplicates_detected[candidate_name].add(norm_type)
+            # Record that we merged this type
+            duplicates_detected[candidate_name].add(norm_type)
 
-        # Convert to simple mapping and print merge notices
+    def _format_grouping_results(
+        self,
+        candidates: Dict[str, Dict[str, Tuple[str, float]]],
+        duplicates_detected: Dict[str, set],
+    ) -> Dict[str, Dict[str, str]]:
+        """Format the final results and report any duplicates found.
+        
+        Args:
+            candidates: Dictionary with file paths and timestamps
+            duplicates_detected: Dictionary tracking which types had duplicates
+            
+        Returns:
+            Clean dictionary mapping candidate_name -> { file_type: file_path }
+        """
         result: Dict[str, Dict[str, str]] = {}
+        
         for candidate_name, types_map in candidates.items():
             result[candidate_name] = {t: p for t, (p, _) in types_map.items()}
+            
             if duplicates_detected.get(candidate_name):
                 merged_types = ", ".join(sorted(duplicates_detected[candidate_name]))
                 print(
                     f"🔁 Merged duplicates for {candidate_name}: {merged_types} "
                     f"(kept newest by modified time)"
                 )
-
+        
         return result
+
+    def _get_file_type_aliases(self) -> set:
+        """Get the set of recognized file type aliases.
+        
+        Returns:
+            Set of file type aliases
+        """
+        return {
+            "resume",
+            "coverletter", 
+            "cover",
+            "cover_letter",
+            "application",
+            "questionnaire",
+        }
 
     def _validate_file_size(self, file_path: str) -> Tuple[bool, Optional[str]]:
         """Validate file size against configured limits.

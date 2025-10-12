@@ -26,7 +26,6 @@ def check_dependencies():
         "pydantic",
         "PyPDF2",
         "python-magic",
-        "pandas",
     ]
 
     missing = []

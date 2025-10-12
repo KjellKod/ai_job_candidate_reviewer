@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import pandas as pd
 
 from config import Config
 from models import Evaluation, InterviewPriority, JobContext, RecommendationType
