@@ -81,8 +81,8 @@ jobs:
         MAX_FILE_SIZE_MB: 2
         OPENAI_MODEL: gpt-4
       run: |
-        # Run integration tests with longer timeout
-        python -m pytest tests/integration/ -v --tb=short --timeout=30
+        # Run integration tests
+        python -m pytest tests/integration/ -v --tb=short
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
@@ -269,7 +269,7 @@ jobs:
         # Only run tests marked as api_integration if API key is available
         if [ -n "$OPENAI_API_KEY" ]; then
           echo "🔑 Running real API integration tests..."
-          python -m pytest tests/ -v --tb=short -m "api_integration" --timeout=60
+          python -m pytest tests/ -v --tb=short -m "api_integration"
         else
           echo "⚠️  Skipping API integration tests - no API key available"
           echo "This is normal for forks and most PRs"
