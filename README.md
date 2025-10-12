@@ -1,77 +1,136 @@
-# AI Job Candidate Reviewer
+# 🤖 AI Job Candidate Reviewer
 
-Recruiting at scale is hard — it's time-consuming, subjective, and inconsistent.
-The AI Job Candidate Reviewer helps teams automate first-pass resume screening while keeping humans firmly in control.
+> **Stop spending hours manually screening resumes. Let AI do the first pass.**
 
-Simply drop resumes and job descriptions into organized folders, and receive AI-generated candidate rankings with detailed notes and scores. The system learns from your feedback to refine its screening accuracy over time.
+Transform your hiring workflow with AI-powered resume screening that's fast, consistent, and adapts to your preferences.
 
-**🤖 Powered by GPT-5** (with intelligent fallback to GPT-4/GPT-4-turbo). The CLI prints the model used for every AI-related command.
+## 🎯 Why This Matters
+
+Recruiting at scale is **painful**:
+- ⏰ **Time-consuming** - Hours spent reading similar resumes
+- 🎲 **Inconsistent** - Different standards across reviewers or days
+- 😓 **Draining** - Mental fatigue from repetitive evaluation
+
+**This tool changes that:**
+
+✨ **Drop files, get rankings** - No complex setup, just organized folders  
+🎯 **Consistent evaluations** - Same criteria applied to every candidate  
+📊 **Detailed insights** - Scores, strengths, concerns, and interview priorities  
+🔄 **Gets smarter** - Learns from your feedback to match your preferences  
+🚀 **Powered by GPT-5** - Latest AI models with automatic fallback
 
 ```
-Candidate → AI Evaluation → Human Feedback → AI Learning → Improved Evaluations
+Drop Files → AI Analysis → Ranked Results → Your Feedback → Improved Rankings
 ```
 
-How It Helps
-   •  Quickly identify top candidates with consistent, structured evaluations
-   •  Reduce manual effort without losing human judgment
-   •  Adapt the AI’s ranking logic to your hiring patterns
-   •  Reuse screening context for future, similar positions
+## ✨ Key Features
 
+- 🎯 **Structured evaluations** with scores (0-100) and recommendations
+- 📈 **Interview priorities** (HIGH/MEDIUM/LOW) to focus your time
+- 💡 **AI learning** from your feedback improves future screenings
+- 📄 **Multiple formats** - CSV reports and HTML summaries
+- 🔒 **Privacy-first** - All data stays local, only candidate content goes to OpenAI
+- ⚡ **Fast** - Process multiple candidates in seconds
 
-⚠️ Important Note
-The AI reviewer assists in ranking candidates but is not a decision maker.
-Always review AI-generated evaluations before making hiring decisions.
-The system improves through human feedback and builds reusable screening context across similar roles.
+## 🚀 5-Minute Setup
 
-
-
-## Quick Start
+**Prerequisites:** Python 3.9+, OpenAI API key ([get one here](https://platform.openai.com/api-keys))
 
 ```bash
-# 1. Install and setup environment
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env and add your OpenAI API key
+# 1. Clone and install
+git clone <repo-url>
+cd ai_job_candidate_reviewer
+pip3 install -r requirements.txt
 
-# 2. Test connection
+# 2. Configure API key
+echo "OPENAI_API_KEY=sk-proj-your-key-here" > .env
+
+# 3. Verify it works
 python3 candidate_reviewer.py test-connection
-
-# 3. Setup job (once per position)
-# Drop files into data/intake/:
-# - job_description.pdf (required)
-# - ideal_candidate.txt (optional) 
-# - warning_flags.txt (optional)
-python3 candidate_reviewer.py setup-job "mobile_engineer"
-
-# Update an existing job context later (refresh ideal/warnings)
-python3 candidate_reviewer.py setup-job "mobile_engineer" --update
-
-# 4. Add candidates (ongoing)
-# Drop files into data/intake/:
-# - resume_firstname_lastname.pdf (required)
-# - coverletter_firstname_lastname.pdf (optional)
-# - application_firstname_lastname.txt (optional)
-python3 candidate_reviewer.py process-candidates "mobile_engineer"
-
-# 5. Review and rank candidates
-python3 candidate_reviewer.py show-candidates "mobile_engineer"
-
-# 6. Provide feedback to improve AI
-python3 candidate_reviewer.py provide-feedback "mobile_engineer" "candidate_name" "feedback text"
-
-# 7. Re-evaluate with improved AI
-python3 candidate_reviewer.py re-evaluate "mobile_engineer"
-
-# 8. View detailed reports
-python3 candidate_reviewer.py open-reports "mobile_engineer"
 ```
 
-- ✅ **Super simple** - just rename files and drop them
-- ✅ **No complex commands** - no file path arguments
-- ✅ **Less errors** - can't typo file paths
+**That's it!** You're ready to start screening candidates.
+
+---
+
+## 📚 Table of Contents
+
+- [Quick Start Guide](#quick-start-guide) - Get up and running fast
+- [Environment Configuration](#environment-configuration) - API keys and data paths
+- [File Organization](#file-organization) - How files are structured
+- [All Commands](#all-commands) - Complete command reference
+- [Results & Reports](#results) - Understanding the output
+- [Advanced Features](#optional-improve-results) - Fine-tune AI behavior
+- [Troubleshooting](#troubleshooting) - Common issues
+
+---
+
+## 🎬 Quick Start Guide
+
+### Step 1: Setup a Job (once per position)
+
+```bash
+# Create the data directory
+mkdir -p data/intake
+
+# Drop these files into data/intake/:
+# - job_description.pdf (required)
+# - ideal_candidate.txt (optional - helps AI understand what you want)
+# - warning_flags.txt (optional - red flags to watch for)
+
+# Process the job
+python3 candidate_reviewer.py setup-job "senior_engineer"
+```
+
+### Step 2: Process Candidates (ongoing)
+
+```bash
+# Drop candidate files into data/intake/:
+# - resume_john_doe.pdf
+# - coverletter_john_doe.pdf (optional)
+# - application_john_doe.txt (optional)
+
+# Process them
+python3 candidate_reviewer.py process-candidates "senior_engineer"
+```
+
+### Step 3: Review Rankings
+
+```bash
+# See ranked candidates in terminal
+python3 candidate_reviewer.py show-candidates "senior_engineer"
+
+# Or open detailed HTML report in browser
+python3 candidate_reviewer.py open-reports "senior_engineer"
+```
+
+### Step 4: Teach the AI (optional but powerful)
+
+```bash
+# Give feedback on evaluations
+python3 candidate_reviewer.py provide-feedback "senior_engineer" "john_doe" \
+  "Too much weight on years of experience, not enough on practical skills"
+
+# Re-evaluate with improved AI
+python3 candidate_reviewer.py re-evaluate "senior_engineer"
+```
+
+**💡 Pro Tip:** The AI learns from your feedback and applies those insights to future evaluations!
+
+---
+
+## ⚠️ Important Notes
+
+- **AI assists, humans decide** - Always review AI evaluations before hiring decisions
+- **Privacy** - Candidate data is sent to OpenAI for analysis per their privacy policy
+- **Continuous improvement** - The system gets better with your feedback
+- **Model visibility** - Every command shows which AI model is being used
 
 
-## Environment Configuration
+
+---
+
+## 🔧 Environment Configuration
 
 ### Required: OpenAI API Key
 
@@ -121,8 +180,9 @@ The application automatically creates these subdirectories if they don't exist:
 
 For more configuration options, see `CONFIGURATION.md`.
 
+---
 
-## File Organization
+## 📂 File Organization
 
 **1. Drop files here:**
 
@@ -177,7 +237,9 @@ Notes:
 - Candidate files are copied into their candidate directories and the originals in intake are cleaned up after successful processing.
 - If a candidate is missing required files, processing stops at that candidate with a clear error so you can fix/remove and retry.
 
-## All Commands
+---
+
+## 📖 All Commands
 
 ### **Core Workflow:**
 ```bash
@@ -237,7 +299,9 @@ Options:
 - list-models: no options
 - list-jobs: no options
 
-## Results
+---
+
+## 📊 Results & Reports
 
 **CSV Format:** Open `candidate_scores.csv` in Excel with:
 - **Overall Score** (0-100)
@@ -268,14 +332,18 @@ Job: senior_python_dev_2024
 - **CSV** for detailed spreadsheet analysis
 - **Terminal ranking** for quick command-line review
 
-## File Naming
+---
+
+## 📝 File Naming
 
 **Job files:** Any names work, script auto-detects
 **Candidate files:** Include name in filename
 - `resume_john_doe.pdf` → Candidate: "john_doe"
 - `JohnDoe_CV.pdf` → Candidate: "johndoe"
 
-## Optional: Improve Results
+---
+
+## 🎯 Advanced: Improve Results
 
 Create a file that explains the ideal candidate: `ideal_candidate.txt`:
 ```
@@ -309,15 +377,56 @@ Questionnaire red flags:
 
 This way the AI can evaluate both the resume/cover letter AND the questionnaire responses using your specific criteria. It helps catch candidates who look good on paper but give poor application answers, or vice versa.
 
-## Troubleshooting
+---
 
-- **Missing API key:** Add `OPENAI_API_KEY` to `.env` file
-- **No job description:** Drop a PDF into `data/intake/jobs/`
-- **No candidates:** Drop resumes into `data/intake/candidates/`
-- **Multiple PDFs:** Script will ask which job description to use
+## 🔧 Troubleshooting
 
-Get API key: https://platform.openai.com/api-keys
+**Common Issues:**
 
+| Problem | Solution |
+|---------|----------|
+| ❌ Missing API key | Add `OPENAI_API_KEY` to `.env` file ([get key](https://platform.openai.com/api-keys)) |
+| ❌ No job description | Drop a job description PDF into `data/intake/` |
+| ❌ No candidates found | Ensure resume filenames include candidate names (e.g., `resume_john_doe.pdf`) |
+| ❌ File size errors | Check `MAX_FILE_SIZE_MB` setting (default: 2MB) |
+| ❌ Wrong data directory | Verify `BASE_DATA_PATH` environment variable |
 
+**Still stuck?** Check out:
+- `GETTING_STARTED.md` - Detailed setup guide
+- `CONFIGURATION.md` - All configuration options
+- `DEVELOPMENT.md` - Development workflow and testing
 
+---
 
+## 🤝 Contributing
+
+Found a bug? Have an idea? Contributions are welcome!
+
+1. Check existing issues or create a new one
+2. Fork the repository
+3. Make your changes
+4. Run `./pre-push.sh` to validate
+5. Submit a pull request
+
+See `DEVELOPMENT.md` for development setup and guidelines.
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) file for details.
+
+This software is provided "as-is" for evaluation and screening assistance. The AI-generated evaluations should be reviewed by humans before making hiring decisions.
+
+---
+
+## 🙏 Acknowledgments
+
+Built with:
+- 🤖 OpenAI GPT-5 / GPT-4
+- 🐍 Python 3.9+
+- 📦 Click, Pydantic, pypdf
+
+---
+
+**Ready to transform your hiring process?** [Get started now](#🚀-5-minute-setup) 🚀
