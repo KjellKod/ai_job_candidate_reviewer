@@ -1389,6 +1389,42 @@ class CandidateReviewer:
         except KeyboardInterrupt:
             print("\n❌ Reset cancelled")
 
+    def _extract_candidate_name_from_filename(self, filename: str) -> Optional[str]:
+        """Extract candidate name from filename using FileProcessor logic.
+
+        Args:
+            filename: Name of the file to extract candidate name from
+
+        Returns:
+            Extracted candidate name or None if extraction fails
+        """
+        return self.file_processor._extract_candidate_name_from_filename(filename)
+
+    def _candidate_exists_in_system(self, candidate_name: str) -> bool:
+        """Check if a candidate has been processed and exists in the system.
+
+        Args:
+            candidate_name: Name of the candidate to check
+
+        Returns:
+            True if candidate exists in any job's candidate directory, False otherwise
+        """
+        candidates_base_path = Path(self.config.candidates_path)
+
+        if not candidates_base_path.exists():
+            return False
+
+        # Check all job directories for this candidate
+        for job_dir in candidates_base_path.iterdir():
+            if job_dir.is_dir():
+                candidate_dir = job_dir / candidate_name
+                if candidate_dir.exists() and candidate_dir.is_dir():
+                    # Check if there are any files in the candidate directory
+                    if any(candidate_dir.iterdir()):
+                        return True
+
+        return False
+
 
 # CLI Interface
 @click.group(invoke_without_command=True)
