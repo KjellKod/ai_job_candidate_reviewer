@@ -55,13 +55,20 @@ python3 candidate_reviewer.py test-connection
 
 ## 📚 Table of Contents
 
-- [Quick Start Guide](#quick-start-guide) - Get up and running fast
-- [Environment Configuration](#environment-configuration) - API keys and data paths
-- [File Organization](#file-organization) - How files are structured
-- [All Commands](#all-commands) - Complete command reference
-- [Results & Reports](#results) - Understanding the output
-- [Advanced Features](#optional-improve-results) - Fine-tune AI behavior
-- [Troubleshooting](#troubleshooting) - Common issues
+**Getting Started:**
+- [Quick Start Guide](#-quick-start-guide) - Get up and running fast
+- [How It Works](#-how-it-works) - Visual workflow diagram
+- [Environment Configuration](#-environment-configuration) - API keys and data paths
+
+**Using the Tool:**
+- [File Organization](#-file-organization) - How files are structured
+- [All Commands](#-all-commands) - Complete command reference
+- [Results & Reports](#-results--reports) - Understanding the output
+
+**Going Further:**
+- [Advanced Features](#-advanced-improve-results) - Fine-tune AI behavior
+- [Troubleshooting](#-troubleshooting) - Common issues
+- [Additional Resources](#-additional-resources) - Detailed guides
 
 ---
 
@@ -116,6 +123,58 @@ python3 candidate_reviewer.py re-evaluate "senior_engineer"
 ```
 
 **💡 Pro Tip:** The AI learns from your feedback and applies those insights to future evaluations!
+
+---
+
+## 🎨 How It Works
+
+### Visual Workflow
+
+```mermaid
+flowchart TD
+    Start([👤 You Drop Files]) --> Setup{First Time?}
+    
+    Setup -->|Yes| Job[📄 Setup Job<br/>job_description.pdf<br/>ideal_candidate.txt<br/>warning_flags.txt]
+    Setup -->|No| Candidates
+    
+    Job --> Store1[(💾 Job Context<br/>Stored)]
+    Store1 --> Candidates
+    
+    Candidates[📋 Add Candidates<br/>resume_john_doe.pdf<br/>coverletter_john_doe.pdf] --> AI[🤖 AI Analysis<br/>GPT-5/GPT-4]
+    
+    AI --> Eval[📊 Generate Evaluation<br/>• Score 0-100<br/>• Strengths/Concerns<br/>• Recommendation<br/>• Interview Priority]
+    
+    Eval --> Output[📁 Create Reports<br/>• CSV Spreadsheet<br/>• HTML Dashboard<br/>• JSON Details]
+    
+    Output --> Review{👤 You Review}
+    
+    Review -->|Happy| Done([✅ Hire/Reject])
+    Review -->|Needs Tuning| Feedback[💬 Provide Feedback<br/>'Too focused on years<br/>not enough on skills']
+    
+    Feedback --> Learn[(🧠 AI Learns<br/>Insights Stored)]
+    Learn --> ReEval[🔄 Re-evaluate<br/>with Insights]
+    ReEval --> AI
+    
+    style Start fill:#e1f5ff
+    style AI fill:#fff4e1
+    style Learn fill:#f0e1ff
+    style Done fill:#e1ffe1
+    style Output fill:#ffe1f5
+```
+
+### Simple Explanation
+
+1. **📥 Drop Files** → You organize files by name (no complex paths)
+2. **🤖 AI Analyzes** → GPT-5 reads and evaluates each candidate
+3. **📊 Get Rankings** → Receive scores, recommendations, priorities
+4. **💡 Teach AI** → Give feedback, AI adapts to your preferences
+5. **🔄 Improve** → Re-evaluate with smarter AI
+
+**Key Benefits:**
+- ⏱️ **Fast** - Process 10 candidates in seconds
+- 🎯 **Consistent** - Same criteria for everyone
+- 🧠 **Smart** - Learns your preferences over time
+- 📈 **Structured** - Clear scores and priorities
 
 ---
 
@@ -391,10 +450,31 @@ This way the AI can evaluate both the resume/cover letter AND the questionnaire 
 | ❌ File size errors | Check `MAX_FILE_SIZE_MB` setting (default: 2MB) |
 | ❌ Wrong data directory | Verify `BASE_DATA_PATH` environment variable |
 
-**Still stuck?** Check out:
-- `GETTING_STARTED.md` - Detailed setup guide
-- `CONFIGURATION.md` - All configuration options
-- `DEVELOPMENT.md` - Development workflow and testing
+**Still stuck?** Check the [Additional Resources](#-additional-resources) section below for detailed guides.
+
+---
+
+## 📚 Additional Resources
+
+### For Users
+
+- **[Getting Started Guide](GETTING_STARTED.md)** - Detailed step-by-step setup and usage tutorials
+- **[Configuration Guide](CONFIGURATION.md)** - Complete reference for all environment variables and settings
+- **[GitHub Issues](../../issues)** - Report bugs or request features
+
+### For Developers & Contributors
+
+- **[Development Guide](DEVELOPMENT.md)** - Local setup, testing, and contribution workflow
+- **[Architecture Overview](ARCHITECTURE.md)** - System design, components, and data flow
+- **[GitHub Actions Setup](GITHUB_ACTIONS_SETUP.md)** - CI/CD pipeline configuration
+
+**Quick Dev Commands:**
+```bash
+./pre-push.sh              # Run all checks before pushing
+python3 -m pytest tests/   # Run all tests
+python3 -m black .         # Format code
+python3 -m isort .         # Sort imports
+```
 
 ---
 
