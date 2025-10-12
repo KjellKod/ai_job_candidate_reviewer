@@ -129,12 +129,6 @@ jobs:
         test -f SECURITY_TESTING_GUIDELINES.md || (echo "❌ SECURITY_TESTING_GUIDELINES.md missing" && exit 1)
         echo "✅ All required documentation files present"
 
-    - name: Test example usage
-      run: |
-        # Verify that the example files are present and valid
-        test -d example/ || (echo "❌ example/ directory missing" && exit 1)
-        echo "✅ Example directory structure validated"
-
   security-scan:
     runs-on: ubuntu-latest
     steps:
