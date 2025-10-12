@@ -216,7 +216,7 @@ Job: senior_python_dev_2024
 **This shows users both output options:**
 - **CSV** for detailed spreadsheet analysis
 - **Terminal ranking** for quick command-line review
-7
+
 ## File Naming
 
 **Job files:** Any names work, script auto-detects

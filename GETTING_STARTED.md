@@ -78,7 +78,7 @@ data/
 ✅ **Core Pipeline**
 - Configuration management with 2MB file limits
 - PDF text extraction and file processing
-- OpenAI GPT-4o integration (GPT-5 equivalent)
+- OpenAI GPT-4 integration (GPT-5 equivalent)
 - CSV and HTML report generation
 - Terminal display with color coding
 - Complete CLI interface

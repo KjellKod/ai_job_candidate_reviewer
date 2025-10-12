@@ -615,22 +615,22 @@ class FileProcessor:
 
     def _extract_candidate_name_from_filename(self, file_path: str) -> Optional[str]:
         """Extract candidate name from filename using various naming patterns.
-        
+
         Args:
             file_path: Path to the candidate file
-            
+
         Returns:
             Extracted candidate name or None if extraction fails
         """
         filename = Path(file_path).name
         name_no_ext = filename.rsplit(".", 1)[0]
         parts = name_no_ext.split("_")
-        
+
         if len(parts) < 2:
             return None
 
         type_aliases = self._get_file_type_aliases()
-        
+
         # Try different naming patterns
         if parts[0].lower() in type_aliases:
             # Prefix style: resume_firstname_lastname.pdf
@@ -655,39 +655,39 @@ class FileProcessor:
 
     def _normalize_candidate_name(self, candidate_name: str, file_path: str) -> str:
         """Normalize and clean up candidate name.
-        
+
         Args:
             candidate_name: Raw extracted candidate name
             file_path: Original file path for fallback
-            
+
         Returns:
             Normalized candidate name
         """
         if not candidate_name:
             return Path(file_path).name.rsplit(".", 1)[0]
-            
+
         # Remove trailing/leading underscores
         candidate_name = candidate_name.strip("_")
-        
+
         # Handle cases where type suffix wasn't caught
         type_aliases = self._get_file_type_aliases()
         for alias in type_aliases:
             if candidate_name.lower().endswith(f"_{alias}"):
                 candidate_name = candidate_name[: -len(f"_{alias}")]
                 break
-        
+
         # Ensure we have a valid name
         if not candidate_name or candidate_name.lower() in type_aliases:
             candidate_name = Path(file_path).name.rsplit(".", 1)[0]
-            
+
         return candidate_name
 
     def _normalize_file_type(self, file_type: str) -> str:
         """Normalize file type aliases to standard names.
-        
+
         Args:
             file_type: Raw file type
-            
+
         Returns:
             Normalized file type
         """
@@ -707,7 +707,7 @@ class FileProcessor:
         file_path: str,
     ) -> None:
         """Handle duplicate files by keeping the newest version.
-        
+
         Args:
             candidates: Main candidates dictionary
             duplicates_detected: Tracking dictionary for duplicates
@@ -720,7 +720,7 @@ class FileProcessor:
             duplicates_detected[candidate_name] = set()
 
         mtime = os.path.getmtime(file_path)
-        
+
         if norm_type not in candidates[candidate_name]:
             candidates[candidate_name][norm_type] = (file_path, mtime)
         else:
@@ -737,37 +737,37 @@ class FileProcessor:
         duplicates_detected: Dict[str, set],
     ) -> Dict[str, Dict[str, str]]:
         """Format the final results and report any duplicates found.
-        
+
         Args:
             candidates: Dictionary with file paths and timestamps
             duplicates_detected: Dictionary tracking which types had duplicates
-            
+
         Returns:
             Clean dictionary mapping candidate_name -> { file_type: file_path }
         """
         result: Dict[str, Dict[str, str]] = {}
-        
+
         for candidate_name, types_map in candidates.items():
             result[candidate_name] = {t: p for t, (p, _) in types_map.items()}
-            
+
             if duplicates_detected.get(candidate_name):
                 merged_types = ", ".join(sorted(duplicates_detected[candidate_name]))
                 print(
                     f"🔁 Merged duplicates for {candidate_name}: {merged_types} "
                     f"(kept newest by modified time)"
                 )
-        
+
         return result
 
     def _get_file_type_aliases(self) -> set:
         """Get the set of recognized file type aliases.
-        
+
         Returns:
             Set of file type aliases
         """
         return {
             "resume",
-            "coverletter", 
+            "coverletter",
             "cover",
             "cover_letter",
             "application",
