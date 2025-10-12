@@ -205,6 +205,8 @@ class FeedbackManager:
             return
 
         re_evaluated = []
+        total_candidates = len([d for d in candidates_path.iterdir() if d.is_dir() and (not candidate_names or d.name in candidate_names)])
+        current_count = 0
 
         for candidate_dir in candidates_path.iterdir():
             if candidate_dir.is_dir():
@@ -214,14 +216,15 @@ class FeedbackManager:
                 if candidate_names and candidate_name not in candidate_names:
                     continue
 
+                current_count += 1
+
                 # Load candidate data
                 candidate = self._load_candidate_data(candidate_dir)
                 if not candidate:
                     continue
 
                 # Re-evaluate with insights
-                print(f"🔄 Re-evaluating {candidate_name} with updated insights...")
-                print(f"🤖 Using AI Model: {self.ai_client.model}")
+                print(f"🔄 Re-evaluating {candidate_name} ({current_count}/{total_candidates}) with updated insights...")
                 evaluation = self.ai_client.evaluate_candidate(
                     job_context, candidate, job_insights.generated_insights
                 )
