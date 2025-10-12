@@ -14,14 +14,9 @@ exclude =
 per-file-ignores =
     __init__.py:F401
     tests/*:S101,S106
-    # Ignore E402 in file_processor.py - logging config must come before pypdf import
-    file_processor.py:E402
-    # Ignore complexity for CLI handlers and file processing (naturally complex)
-    candidate_reviewer.py:C901
-    file_processor.py:C901
+    file_processor.py:E402,C901
+    candidate_reviewer.py:C901,F541
     feedback_manager.py:C901
-    # Ignore F541 for static messages that don't need placeholders
-    candidate_reviewer.py:F541
     output_generator.py:F541
     test_typo_detection.py:F541
 max-complexity = 15
