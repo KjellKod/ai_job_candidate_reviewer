@@ -4,12 +4,12 @@ import csv
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 import pandas as pd
 
 from config import Config
-from models import Evaluation, JobContext, RecommendationType, InterviewPriority
+from models import Evaluation, InterviewPriority, JobContext, RecommendationType
 
 
 class OutputGenerator:

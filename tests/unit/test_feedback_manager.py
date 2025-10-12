@@ -1,24 +1,25 @@
 """Unit tests for feedback manager."""
 
 import json
-import tempfile
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
+
 import pytest
 
-from feedback_manager import FeedbackManager
-from config import Config
 from ai_client import AIClient
+from config import Config
+from feedback_manager import FeedbackManager
 from models import (
-    HumanFeedback,
-    JobInsights,
-    FeedbackRecord,
-    Evaluation,
-    JobContext,
     Candidate,
-    RecommendationType,
+    Evaluation,
+    FeedbackRecord,
+    HumanFeedback,
     InterviewPriority,
+    JobContext,
+    JobInsights,
+    RecommendationType,
 )
 
 

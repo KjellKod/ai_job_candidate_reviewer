@@ -1,11 +1,11 @@
 """File processing for AI Job Candidate Reviewer."""
 
+import difflib
+import logging
 import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import difflib
-import logging
 
 import pypdf
 
@@ -13,7 +13,7 @@ import pypdf
 logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 from config import Config
-from models import JobFiles, CandidateFiles, JobContext, Candidate
+from models import Candidate, CandidateFiles, JobContext, JobFiles
 
 
 class FileProcessor:

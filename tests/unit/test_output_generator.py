@@ -1,19 +1,15 @@
 """Unit tests for output generator."""
 
-import tempfile
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 
-from output_generator import OutputGenerator
 from config import Config
-from models import (
-    Evaluation,
-    JobContext,
-    RecommendationType,
-    InterviewPriority,
-)
+from models import Evaluation, InterviewPriority, JobContext, RecommendationType
+from output_generator import OutputGenerator
 
 
 class TestOutputGenerator:

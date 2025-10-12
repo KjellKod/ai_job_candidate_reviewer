@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Verify installation and dependencies for AI Job Candidate Reviewer."""
 
-import sys
 import importlib
+import sys
 from pathlib import Path
 
 

@@ -2,15 +2,16 @@
 
 import json
 from unittest.mock import Mock, patch
+
 import pytest
 
 from ai_client import AIClient
 from models import (
-    JobContext,
     Candidate,
     Evaluation,
-    RecommendationType,
     InterviewPriority,
+    JobContext,
+    RecommendationType,
 )
 
 

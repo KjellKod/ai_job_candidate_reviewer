@@ -2,6 +2,7 @@
 """Debug typo detection."""
 
 from pathlib import Path
+
 from config import Config
 from file_processor import FileProcessor
 

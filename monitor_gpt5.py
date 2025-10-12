@@ -2,6 +2,7 @@
 """Monitor GPT-5 availability and test when ready."""
 
 import time
+
 from config import Config
 from open_api_test_connection import OpenAIConnectionTester
 

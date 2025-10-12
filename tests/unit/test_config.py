@@ -3,8 +3,9 @@
 import os
 import tempfile
 from pathlib import Path
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from config import Config, ValidationResult
 

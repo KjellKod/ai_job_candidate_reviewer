@@ -1,14 +1,15 @@
 """Unit tests for file processor."""
 
-import tempfile
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 
-from file_processor import FileProcessor
 from config import Config
-from models import JobFiles, CandidateFiles
+from file_processor import FileProcessor
+from models import CandidateFiles, JobFiles
 
 
 class TestFileProcessor:

@@ -1,16 +1,17 @@
 """Unit tests for data models."""
 
 from datetime import datetime
+
 import pytest
 
 from models import (
-    JobContext,
     Candidate,
     Evaluation,
     HumanFeedback,
+    InterviewPriority,
+    JobContext,
     JobInsights,
     RecommendationType,
-    InterviewPriority,
 )
 
 

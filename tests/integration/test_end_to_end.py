@@ -1,19 +1,20 @@
 """Integration tests for end-to-end pipeline functionality."""
 
-import tempfile
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
+
 import pytest
 
 from candidate_reviewer import CandidateReviewer
 from config import Config
 from models import (
+    Evaluation,
+    InterviewPriority,
     JobSetupResult,
     ProcessingResult,
     RecommendationType,
-    InterviewPriority,
-    Evaluation,
 )
 
 

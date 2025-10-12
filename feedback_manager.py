@@ -5,9 +5,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from config import Config
-from models import HumanFeedback, JobInsights, FeedbackRecord, Evaluation
 from ai_client import AIClient
+from config import Config
+from models import Evaluation, FeedbackRecord, HumanFeedback, JobInsights
 
 
 class FeedbackManager:

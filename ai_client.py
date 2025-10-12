@@ -9,11 +9,11 @@ from openai import OpenAI
 
 from models import (
     APIResponse,
-    Evaluation,
-    JobContext,
     Candidate,
-    RecommendationType,
+    Evaluation,
     InterviewPriority,
+    JobContext,
+    RecommendationType,
 )
 
 

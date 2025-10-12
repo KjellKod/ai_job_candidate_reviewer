@@ -202,6 +202,7 @@ class OpenAIConnectionTester:
 def main():
     """Main function for standalone execution."""
     import os
+
     from dotenv import load_dotenv
 
     print("🔧 OpenAI API Connection Tester")

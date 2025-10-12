@@ -2,29 +2,29 @@
 """Main CLI interface for AI Job Candidate Reviewer."""
 
 import json
-import time
 import os
 import sys
+import time
 from pathlib import Path
 from typing import List, Optional
 
 import click
 
+from ai_client import AIClient
 from config import Config
+from feedback_manager import FeedbackManager
+from file_processor import FileProcessor
 from models import (
-    JobSetupResult,
-    ProcessingResult,
+    CandidateFiles,
     DisplayResult,
     Evaluation,
     JobInsights,
+    JobSetupResult,
+    ProcessingResult,
     RecommendationType,
-    CandidateFiles,
 )
 from open_api_test_connection import OpenAIConnectionTester
-from ai_client import AIClient
-from file_processor import FileProcessor
 from output_generator import OutputGenerator
-from feedback_manager import FeedbackManager
 
 
 class CandidateReviewer:
