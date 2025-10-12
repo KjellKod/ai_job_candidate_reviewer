@@ -255,7 +255,7 @@ class AIClient:
             insights_section = f"""
 AI INSIGHTS FROM PREVIOUS FEEDBACK:
 {job_insights}
-Note: These insights were generated from human feedback on previous 
+Note: These insights were generated from human feedback on previous
 evaluations for this role.
 """
 

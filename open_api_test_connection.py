@@ -98,7 +98,7 @@ class OpenAIConnectionTester:
             else:
                 request_params["max_tokens"] = 1
 
-            response = self.client.chat.completions.create(**request_params)
+            self.client.chat.completions.create(**request_params)
             return True
         except Exception:
             return False

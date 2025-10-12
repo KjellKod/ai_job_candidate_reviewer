@@ -399,8 +399,8 @@ class OutputGenerator:
     <div class="candidate">
         <h3>{rank}. {evaluation.candidate_name}</h3>
         <p>
-            <span class="score">Score: {evaluation.overall_score}/100</span> | 
-            <span class="recommendation {rec_class}">{evaluation.recommendation.value}</span> | 
+            <span class="score">Score: {evaluation.overall_score}/100</span> |
+            <span class="recommendation {rec_class}">{evaluation.recommendation.value}</span> |
             <strong>Priority:</strong> {evaluation.interview_priority.value}
         </p>
 """

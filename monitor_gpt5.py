@@ -27,10 +27,10 @@ def monitor_gpt5_access():
             result = tester.test_connection()
 
             if result.success and tester.model.startswith("gpt-5"):
-                print(f"🎉 SUCCESS! GPT-5 is now available!")
+                print("🎉 SUCCESS! GPT-5 is now available!")
                 print(f"   Using model: {tester.model}")
                 print(f"   Response time: {result.response_time_ms:.0f}ms")
-                print(f"\n✅ Your system will now automatically use GPT-5!")
+                print("\n✅ Your system will now automatically use GPT-5!")
                 break
             else:
                 current_model = tester.model
@@ -39,12 +39,12 @@ def monitor_gpt5_access():
                 if not result.success:
                     print(f"   Error: {result.message}")
 
-            print(f"   Next check in 30 seconds...\n")
+            print("   Next check in 30 seconds...\n")
             time.sleep(30)
             attempt += 1
 
         except KeyboardInterrupt:
-            print(f"\n🛑 Monitoring stopped by user")
+            print("\n🛑 Monitoring stopped by user")
             break
         except Exception as e:
             print(f"❌ Error during monitoring: {e}")

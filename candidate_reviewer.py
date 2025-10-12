@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -1502,7 +1503,7 @@ def list_jobs(ctx):
         click.echo("   (Use job number or full name in commands)\n")
         for i, job in enumerate(jobs, start=1):
             click.echo(f"   {i}. {job}")
-        click.echo(f"\n💡 Example: process-candidates 1")
+        click.echo("\n💡 Example: process-candidates 1")
         click.echo(f"   Or:       process-candidates {jobs[0]}")
     else:
         click.echo("📋 No jobs found. Use setup-job to create one.")
