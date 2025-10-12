@@ -55,11 +55,12 @@ class TestTypoDetection:
         Returns:
             Suggested corrected filename
         """
-        file_extension = Path(filename).suffix
-        name_part = filename[len(filename.split("_")[0]) + 1 :].replace(
-            file_extension, ""
-        )
-        return f"{correct_prefix}{name_part}{file_extension}"
+        suffix = Path(filename).suffix
+        stem = Path(filename).stem  # filename without extension
+        # Split only on the first underscore to avoid brittle slicing
+        _first, sep, rest = stem.partition("_")
+        name_part = rest if sep else stem
+        return f"{correct_prefix}{name_part}{suffix}"
 
     def test_typo_detection_with_resume_typo(self):
         """Test that 'resum_' is detected as typo of 'resume_'."""
