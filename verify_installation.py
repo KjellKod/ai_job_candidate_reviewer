@@ -23,7 +23,6 @@ def check_dependencies():
         "openai",
         "python-dotenv",
         "click",
-        "pydantic",
         "pypdf",
     ]
 

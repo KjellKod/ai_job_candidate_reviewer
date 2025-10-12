@@ -1,6 +1,6 @@
 # AI Job Candidate Reviewer
 
-> **Stop spending hours manually screening resumes. Let AI do the first pass.**
+ **Stop spending hours manually screening resumes. Let AI do the first pass.**
 
 Transform your hiring workflow with AI-powered resume screening that's fast, consistent, and adapts to your preferences.
 
@@ -10,6 +10,7 @@ Recruiting at scale is **painful**:
 - **Time-consuming** - Hours spent reading similar resumes
 - **Inconsistent** - Different standards across reviewers or days
 - **Draining** - Mental fatigue from repetitive evaluation
+- **Lost opportunities** - Best candidates buried under bulk-spam and low-quality applications
 
 **This tool changes that:**
 
@@ -181,7 +182,7 @@ flowchart TD
 ## ⚠️ Important Notes
 
 - **AI assists, humans decide** - Always review AI evaluations before hiring decisions
-- **Privacy** - Candidate data is sent to OpenAI for analysis per their privacy policy
+- **Privacy** - Candidate data is sent to OpenAI for analysis per their [privacy policy](https://openai.com/policies/row-privacy-policy/)
 - **Continuous improvement** - The system gets better with your feedback
 - **Model visibility** - Every command shows which AI model is being used
 
@@ -422,7 +423,7 @@ Questionnaire responses should show:
 
 Create `warning_flags.txt`:
 ```
-• Job hopping (3+ jobs in 2 years)
+• Job hopping (6+ jobs in 2 years)
 • No relevant programming experience
 • Poor written communication
 
@@ -432,6 +433,10 @@ Questionnaire red flags:
 • Unrealistic claims or timelines
 • Negative attitude toward previous employers
 • Avoiding technical questions
+• Hostile answers on application questionnaire
+• Using N/A, - and other no-answers for the application questionnaire
+
+
 ```
 
 This way the AI can evaluate both the resume/cover letter AND the questionnaire responses using your specific criteria. It helps catch candidates who look good on paper but give poor application answers, or vice versa.
@@ -505,7 +510,7 @@ This software is provided "as-is" for evaluation and screening assistance. The A
 Built with:
 - OpenAI GPT-5 / GPT-4
 - Python 3.9+
-- Click, Pydantic, pypdf
+- Click, pypdf
 
 ---
 

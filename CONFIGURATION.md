@@ -99,7 +99,7 @@ All other settings use sensible defaults.
 ```env
 # .env
 OPENAI_API_KEY=sk-proj-abc123...
-OPENAI_MODEL=gpt-4-turbo  # Optional: force a specific model
+OPENAI_MODEL=gpt-4-turbo  # Optional: force a specific model. See also [OpenAI --> Settings](https://platform.openai.com/settings/organization/general)
 BASE_DATA_PATH=./data_dev
 MAX_FILE_SIZE_MB=5
 ```

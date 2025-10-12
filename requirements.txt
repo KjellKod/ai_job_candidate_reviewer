@@ -3,7 +3,6 @@
 openai>=1.0.0
 python-dotenv>=1.0.0
 click>=8.0.0
-pydantic>=2.0.0
 
 # File processing
 pypdf>=4.0.0  # Updated from deprecated PyPDF2

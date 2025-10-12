@@ -78,7 +78,7 @@ data/
 ✅ **Core Pipeline**
 - Configuration management with 2MB file limits
 - PDF text extraction and file processing
-- OpenAI GPT-4 integration (GPT-5 equivalent)
+- OpenAI GPT-5 (or GPT-4 equivalent, you can control what models are available for your API key through [OpenAI --> Settings](https://platform.openai.com/settings/organization/general) --> Limits)
 - CSV and HTML report generation
 - Terminal display with color coding
 - Complete CLI interface
