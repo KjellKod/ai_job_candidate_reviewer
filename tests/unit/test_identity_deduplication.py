@@ -34,12 +34,13 @@ class TestIdentifierExtraction:
             config = Config()
             processor = FileProcessor(config)
 
-        text = "Call me at (555) 123-4567 or +1 555-987-6543"
+        text = "Call me at (555) 123-4567 or +1 555-987-6543 or +55 11 98116-5748"
         identifiers = processor._extract_identifiers_from_text(text)
 
         # Phones are normalized to digits only
         assert "5551234567" in identifiers["phones"]
         assert "15559876543" in identifiers["phones"]
+        assert "5511981165748" in identifiers["phones"]
 
     def test_extract_linkedin_profile(self):
         """Test LinkedIn profile extraction."""

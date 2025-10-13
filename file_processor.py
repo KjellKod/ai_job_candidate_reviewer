@@ -19,11 +19,11 @@ from models import Candidate, CandidateFiles, JobContext, JobFiles
 
 # Regex patterns for extracting candidate identifiers
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-PHONE_RE = re.compile(
-    r"(?:\+?\d{1,3}[ .-]?)?(?:\(?\d{3}\)?|\d{3})[ .-]?\d{3}[ .-]?\d{4}\b"
-)
+# More permissive international phone pattern; final validation happens after normalization
+# Matches +<cc> and common separators, with at least ~9 characters total, ending in a digit
+PHONE_RE = re.compile(r"(?:(?<=\s)|(?<=^))(?:\+?\d|\(\d{2,4}\))[\d\s().-]{6,}\d\b")
 LINKEDIN_RE = re.compile(
-    r"(?:https?://)?(?:www\.)?linkedin\.com/(?:in|pub|mwlite/in)/([A-Za-z0-9\-_%]+)",
+    r"(?:https?://)?(?:www\.)?linkedin\.com/(?:in|pub|mwlite/in)/\s*([A-Za-z0-9._\-_%]+)",
     re.I,
 )
 GITHUB_RE = re.compile(r"(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9\-]+)", re.I)
@@ -435,8 +435,14 @@ class FileProcessor:
         # Extract emails (lowercase for comparison)
         emails = set(m.group(0).lower() for m in EMAIL_RE.finditer(text))
 
-        # Extract phones (digits only for comparison)
-        phones = set(re.sub(r"\D", "", m.group(0)) for m in PHONE_RE.finditer(text))
+        # Extract phones (digits only for comparison); keep only plausible lengths (>=9)
+        raw_phones = set(m.group(0) for m in PHONE_RE.finditer(text))
+        phones = set()
+        for rp in raw_phones:
+            digits = re.sub(r"\D", "", rp)
+            # Heuristic: many international numbers have 9-15 digits
+            if 9 <= len(digits) <= 15:
+                phones.add(digits)
 
         # Extract LinkedIn profiles (normalized URLs)
         linkedin = set()
@@ -508,8 +514,66 @@ class FileProcessor:
                         "github": set(data.get("github", [])),
                     }
                     records.append(record)
-                except (json.JSONDecodeError, OSError):
                     continue
+                except (json.JSONDecodeError, OSError):
+                    # Fall through to attempt reconstruction
+                    pass
+
+            # Fallback: reconstruct metadata for legacy candidates without meta file
+            try:
+                resume_file = None
+                cover_letter_file = None
+                application_file = None
+
+                for fp in cand_dir.iterdir():
+                    if not fp.is_file():
+                        continue
+                    name = fp.name.lower()
+                    if (
+                        name.startswith("resume.")
+                        or name.startswith("resume_")
+                        or name == "resume.pdf"
+                    ):
+                        resume_file = fp
+                    elif (
+                        name.startswith("cover_letter.")
+                        or name.startswith("cover_letter_")
+                        or name == "cover_letter.pdf"
+                    ):
+                        cover_letter_file = fp
+                    elif (
+                        name.startswith("application.")
+                        or name.startswith("application_")
+                        or name == "application.txt"
+                    ):
+                        application_file = fp
+
+                # Extract whatever text we can
+                texts: List[str] = []
+                for f in [resume_file, cover_letter_file, application_file]:
+                    if f:
+                        content, _ = self.extract_text_from_file(str(f))
+                        if content:
+                            texts.append(content)
+                combined = " ".join(texts)
+                ids = self._extract_identifiers_from_text(combined)
+
+                # Save reconstructed metadata for future runs
+                self._save_candidate_metadata(str(cand_dir), ids)
+
+                records.append(
+                    {
+                        "name": cand_dir.name,
+                        "dir": str(cand_dir),
+                        "emails": ids.get("emails", set()),
+                        "phones": ids.get("phones", set()),
+                        "linkedin": ids.get("linkedin", set()),
+                        "github": ids.get("github", set()),
+                    }
+                )
+            except Exception:
+                # Best effort; skip if anything goes wrong
+                continue
 
         return records
 
@@ -743,6 +807,13 @@ class FileProcessor:
             (r"^(.+)_cover_letter\.(pdf|txt)$", "coverletter"),
             (r"^(.+)_application\.(txt|md)$", "application"),
             (r"^(.+)_questionnaire\.(txt|md)$", "application"),
+            # Dot-separated variants (e.g., First_Last.resume.pdf)
+            (r"^(.+)\.resume\.(pdf|txt)$", "resume"),
+            (r"^(.+)\.coverletter\.(pdf|txt)$", "coverletter"),
+            (r"^(.+)\.cover\.(pdf|txt)$", "coverletter"),
+            (r"^(.+)\.cover_letter\.(pdf|txt)$", "coverletter"),
+            (r"^(.+)\.application\.(txt|md)$", "application"),
+            (r"^(.+)\.questionnaire\.(txt|md)$", "application"),
         ]
 
         # Expected prefixes for typo detection
@@ -1206,22 +1277,47 @@ class FileProcessor:
                 word in filename_lower
                 for word in ["resum", "cv", "cover", "application", "questionnaire"]
             ):
-                # Try to suggest a proper name
-                name_base = filename.rsplit(".", 1)[0] if "." in filename else filename
+                # Try to suggest a proper name, supporting dot-separated type (e.g., First_Last.resume.pdf)
+                stem = Path(filename).stem  # without last extension
                 ext = Path(filename).suffix
 
-                # Clean up the name (remove spaces, standardize)
-                clean_name = name_base.replace(" ", "_").strip()
-
-                # Suggest based on content hints
-                if "resum" in filename_lower or "cv" in filename_lower:
-                    suggestion = f"{clean_name}_resume{ext}"
-                elif "cover" in filename_lower:
-                    suggestion = f"{clean_name}_cover{ext}"
-                elif (
-                    "application" in filename_lower or "questionnaire" in filename_lower
+                # If stem already ends with _resume/_coverletter/_application, don't duplicate
+                if re.search(
+                    r"(_resume|_cover(letter)?|_cover_letter|_application|_questionnaire)$",
+                    stem,
+                    re.I,
                 ):
-                    suggestion = f"{clean_name}_application{ext}"
+                    suggestion = f"{stem}{ext}"
+                else:
+                    # Convert dot-separated type to suffix pattern
+                    m = re.search(
+                        r"\.(resume|coverletter|cover|cover_letter|application|questionnaire)$",
+                        stem,
+                        re.I,
+                    )
+                    if m:
+                        name_part = re.sub(
+                            r"\.(resume|coverletter|cover|cover_letter|application|questionnaire)$",
+                            "",
+                            stem,
+                            flags=re.I,
+                        )
+                        type_token = m.group(1).lower()
+                        if type_token in ["cover", "coverletter", "cover_letter"]:
+                            type_token = "coverletter"
+                        suggestion = f"{name_part}_{type_token}{ext}"
+                    else:
+                        # Fallback to content hints
+                        clean_name = stem.replace(" ", "_").strip()
+                        if "resum" in filename_lower or "cv" in filename_lower:
+                            suggestion = f"{clean_name}_resume{ext}"
+                        elif "cover" in filename_lower:
+                            suggestion = f"{clean_name}_cover{ext}"
+                        elif (
+                            "application" in filename_lower
+                            or "questionnaire" in filename_lower
+                        ):
+                            suggestion = f"{clean_name}_application{ext}"
 
             unrecognized.append((filename, suggestion))
 

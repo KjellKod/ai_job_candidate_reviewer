@@ -1650,7 +1650,7 @@ def process_candidates(
     job_name = resolved
 
     click.echo(f"🔄 Processing candidates for job: {job_name}")
-    ctx.obj["reviewer"]._print_model_info("candidate evaluation")
+    # Model info is printed inside reviewer.process_candidates/process_single_candidate
 
     if resume:
         # Process single candidate with direct paths
@@ -1807,7 +1807,7 @@ def re_evaluate(ctx, job_name: str, candidates):
         sys.exit(1)
     job_name = resolved
     print(f"📋 Job: {job_name}")
-    reviewer._print_model_info("re-evaluation")
+    # Model info is printed inside reviewer.re_evaluate_candidates
     candidate_list = list(candidates) if candidates else None
     reviewer.re_evaluate_candidates(job_name, candidate_list)
 
