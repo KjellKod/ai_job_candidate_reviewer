@@ -232,8 +232,10 @@ jobs:
   # Optional: Real API Integration Tests (only run if API key is available)
   api-integration-tests:
     runs-on: ubuntu-latest
-    # Only run if the secret is available (typically only on main branch or specific PRs)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'KjellKod'
+    # Run on pushes to main in the source repo, and on PRs from branches in the same repo (not forks)
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'KjellKod') ||
+      (github.event_name == 'pull_request' && github.repository_owner == 'KjellKod' && github.event.pull_request.head.repo.fork == false)
     
     steps:
     - name: Checkout code
