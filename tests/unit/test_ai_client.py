@@ -26,9 +26,18 @@ class TestAIClient:
         assert client.model == "gpt-4o"
         assert client.client is not None
 
-    def test_gpt5_parameter_handling(self):
-        """Test that GPT-5 models use correct parameters."""
-        client = AIClient("test_key", "gpt-5")
+    @pytest.mark.parametrize(
+        "model,expected_param",
+        [
+            ("gpt-5", "max_completion_tokens"),
+            ("gpt-5-turbo", "max_completion_tokens"),
+            ("gpt-4o", "max_tokens"),
+            ("gpt-4", "max_tokens"),
+        ],
+    )
+    def test_model_parameter_selection(self, model, expected_param):
+        """Ensure correct token-limit parameter and value for each model variant."""
+        client = AIClient("test_key", model)
 
         # Mock the OpenAI client
         mock_response = Mock()
@@ -41,38 +50,23 @@ class TestAIClient:
         with patch.object(
             client.client.chat.completions, "create", return_value=mock_response
         ) as mock_create:
-            # Test that GPT-5 uses max_completion_tokens
             messages = [{"role": "user", "content": "test"}]
             client._make_request(messages)
 
-            # Verify the correct parameter was used
             call_args = mock_create.call_args
-            assert "max_completion_tokens" in call_args.kwargs
-            assert "max_tokens" not in call_args.kwargs
+            call_kwargs = call_args.kwargs
 
-    def test_gpt4_parameter_handling(self):
-        """Test that GPT-4 models use correct parameters."""
-        client = AIClient("test_key", "gpt-4o")
+            # Verify the correct parameter is present with the correct value
+            assert expected_param in call_kwargs
+            assert call_kwargs[expected_param] == 2000
 
-        # Mock the OpenAI client
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].message.content = (
-            '{"overall_score": 75, "recommendation": "YES", "strengths": ["test"], "concerns": ["test"], "interview_priority": "MEDIUM", "detailed_notes": "test"}'
-        )
-        mock_response.usage = None
-
-        with patch.object(
-            client.client.chat.completions, "create", return_value=mock_response
-        ) as mock_create:
-            # Test that GPT-4 uses max_tokens
-            messages = [{"role": "user", "content": "test"}]
-            client._make_request(messages)
-
-            # Verify the correct parameter was used
-            call_args = mock_create.call_args
-            assert "max_tokens" in call_args.kwargs
-            assert "max_completion_tokens" not in call_args.kwargs
+            # Verify the opposite parameter is not present
+            opposite = (
+                "max_tokens"
+                if expected_param == "max_completion_tokens"
+                else "max_completion_tokens"
+            )
+            assert opposite not in call_kwargs
 
     def test_evaluation_prompt_building(self):
         """Test evaluation prompt construction."""
