@@ -212,18 +212,9 @@ class FeedbackManager:
 
         # Clean up stale duplicate warnings before re-evaluation
         self._cleanup_stale_duplicate_warnings(job_name)
-        
-        re_evaluated = []
-        skipped_rejected = []
-        total_candidates = len(
-            [
-                d
-                for d in candidates_path.iterdir()
-                if d.is_dir() and (not candidate_names or d.name in candidate_names)
-            ]
-        )
-        current_count = 0
 
+        # Load existing evaluations and sort by score to process top candidates first
+        candidate_scores = []
         for candidate_dir in candidates_path.iterdir():
             if candidate_dir.is_dir():
                 candidate_name = candidate_dir.name
@@ -236,58 +227,82 @@ class FeedbackManager:
                 if not candidate_names and self._is_candidate_rejected(
                     job_name, candidate_name
                 ):
-                    skipped_rejected.append(candidate_name)
                     continue
 
-                current_count += 1
-
-                # Load candidate data
-                candidate = self._load_candidate_data(candidate_dir)
-                if not candidate:
-                    continue
-
-                # Re-evaluate (conditionally with insights)
-                applied_insights = bool(job_insights)
-                print(
-                    f"🔄 Re-evaluating {candidate_name} ({current_count}/{total_candidates}) "
-                    + (
-                        "with insights..."
-                        if applied_insights
-                        else "without insights..."
-                    )
-                )
-
-                # Load previous evaluation for delta display
-                prev_eval_path = candidate_dir / "evaluation.json"
-                previous_score = None
-                if prev_eval_path.exists():
+                # Load existing score for sorting (if available)
+                eval_path = candidate_dir / "evaluation.json"
+                score = 0  # Default for candidates without evaluation
+                if eval_path.exists():
                     try:
-                        with open(prev_eval_path, "r", encoding="utf-8") as f:
-                            prev_data = json.load(f)
-                            previous_score = prev_data.get("overall_score")
+                        with open(eval_path, "r", encoding="utf-8") as f:
+                            eval_data = json.load(f)
+                            score = eval_data.get("overall_score", 0)
                     except Exception:
-                        previous_score = None
-                evaluation = self.ai_client.evaluate_candidate(
-                    job_context,
-                    candidate,
-                    job_insights.generated_insights if job_insights else None,
+                        pass
+
+                candidate_scores.append((score, candidate_name, candidate_dir))
+
+        # Sort by score descending (highest scores first)
+        candidate_scores.sort(key=lambda x: x[0], reverse=True)
+
+        re_evaluated = []
+        skipped_rejected = []
+        total_candidates = len(candidate_scores)
+        current_count = 0
+
+        for score, candidate_name, candidate_dir in candidate_scores:
+            # Double-check rejection status (in case it changed)
+            if not candidate_names and self._is_candidate_rejected(
+                job_name, candidate_name
+            ):
+                skipped_rejected.append(candidate_name)
+                continue
+
+            current_count += 1
+
+            # Load candidate data
+            candidate = self._load_candidate_data(candidate_dir)
+            if not candidate:
+                continue
+
+            # Re-evaluate (conditionally with insights)
+            applied_insights = bool(job_insights)
+            print(
+                f"🔄 Re-evaluating {candidate_name} ({current_count}/{total_candidates}) "
+                + ("with insights..." if applied_insights else "without insights...")
+            )
+
+            # Load previous evaluation for delta display
+            prev_eval_path = candidate_dir / "evaluation.json"
+            previous_score = None
+            if prev_eval_path.exists():
+                try:
+                    with open(prev_eval_path, "r", encoding="utf-8") as f:
+                        prev_data = json.load(f)
+                        previous_score = prev_data.get("overall_score")
+                except Exception:
+                    previous_score = None
+            evaluation = self.ai_client.evaluate_candidate(
+                job_context,
+                candidate,
+                job_insights.generated_insights if job_insights else None,
+            )
+
+            # Save new evaluation (keep history)
+            self._save_evaluation_with_history(candidate_dir, evaluation)
+            re_evaluated.append(candidate_name)
+
+            # Report delta if previous score available
+            if previous_score is not None:
+                delta = evaluation.overall_score - int(previous_score)
+                sign = "+" if delta >= 0 else ""
+                print(
+                    f"✅ Re-evaluated {candidate_name} (was {previous_score} → now {evaluation.overall_score} | Δ {sign}{delta})"
                 )
-
-                # Save new evaluation (keep history)
-                self._save_evaluation_with_history(candidate_dir, evaluation)
-                re_evaluated.append(candidate_name)
-
-                # Report delta if previous score available
-                if previous_score is not None:
-                    delta = evaluation.overall_score - int(previous_score)
-                    sign = "+" if delta >= 0 else ""
-                    print(
-                        f"✅ Re-evaluated {candidate_name} (was {previous_score} → now {evaluation.overall_score} | Δ {sign}{delta})"
-                    )
-                else:
-                    print(
-                        f"✅ Re-evaluated {candidate_name} (Score: {evaluation.overall_score}/100)"
-                    )
+            else:
+                print(
+                    f"✅ Re-evaluated {candidate_name} (Score: {evaluation.overall_score}/100)"
+                )
 
         if re_evaluated:
             print(
@@ -444,24 +459,22 @@ class FeedbackManager:
 
     def _cleanup_stale_duplicate_warnings(self, job_name: str) -> None:
         """Remove duplicate warnings that reference non-existent candidates.
-        
+
         Args:
             job_name: Name of the job
         """
         candidates_path = Path(self.config.candidates_path) / job_name
         if not candidates_path.exists():
             return
-        
+
         # Get list of all existing candidate names
-        existing_candidates = {
-            d.name for d in candidates_path.iterdir() if d.is_dir()
-        }
-        
+        existing_candidates = {d.name for d in candidates_path.iterdir() if d.is_dir()}
+
         removed_count = 0
         for candidate_dir in candidates_path.iterdir():
             if not candidate_dir.is_dir():
                 continue
-            
+
             warning_path = candidate_dir / "DUPLICATE_WARNING.txt"
             if warning_path.exists():
                 try:
@@ -471,8 +484,10 @@ class FeedbackManager:
                     for line in content.splitlines():
                         if "shares identifiers with:" in line:
                             # Extract the other candidate name
-                            other_name = line.split("shares identifiers with:")[-1].strip()
-                            
+                            other_name = line.split("shares identifiers with:")[
+                                -1
+                            ].strip()
+
                             # Check if the other candidate still exists
                             if other_name not in existing_candidates:
                                 # Remove the stale warning
@@ -482,26 +497,26 @@ class FeedbackManager:
                 except (OSError, Exception):
                     # If we can't read/parse the file, skip it
                     pass
-        
+
         if removed_count > 0:
             print(f"   🧹 Cleaned up {removed_count} stale duplicate warning(s)")
-    
+
     def _is_candidate_rejected(self, job_name: str, candidate_name: str) -> bool:
         """Check if a candidate is marked as rejected.
-        
+
         Args:
             job_name: Name of the job
             candidate_name: Name of the candidate
-            
+
         Returns:
             True if candidate is rejected, False otherwise
         """
         candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
         meta_path = candidate_dir / "candidate_meta.json"
-        
+
         if not meta_path.exists():
             return False
-        
+
         try:
             with open(meta_path, "r", encoding="utf-8") as f:
                 meta = json.load(f)
