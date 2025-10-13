@@ -95,8 +95,9 @@ jobs:
     - name: Security check - ensure no API keys in test output
       run: |
         # Check that no real API keys appear in test output or files
-        if grep -r "sk-[a-zA-Z0-9]" tests/ --exclude-dir=__pycache__ || \
-           grep -r "sk-proj-[a-zA-Z0-9]" tests/ --exclude-dir=__pycache__; then
+        # Only flag keys that look real (>=20 chars after prefix). Allow short test tokens like "sk-test123".
+        if grep -REn "sk-[A-Za-z0-9]{20,}" tests/ --exclude-dir=__pycache__ >/dev/null || \
+           grep -REn "sk-proj-[A-Za-z0-9]{20,}" tests/ --exclude-dir=__pycache__ >/dev/null; then
           echo "❌ SECURITY VIOLATION: Real API keys found in test files!"
           echo "Please review SECURITY_TESTING_GUIDELINES.md"
           exit 1
