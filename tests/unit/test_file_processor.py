@@ -101,13 +101,13 @@ class TestFileProcessor:
                 temp_file = tempfile.NamedTemporaryFile(
                     delete=False, prefix="", suffix=f"_{filename}"
                 )
+                # Close the handle so Windows can rename/move the file
+                temp_file.close()
                 temp_files.append(temp_file.name)
 
-                # Rename to have the proper structure for the test
-                proper_name = temp_file.name.replace(
-                    temp_file.name.split("/")[-1], filename
-                )
-                os.rename(temp_file.name, proper_name)
+                # Rename to have the proper structure for the test (OS-agnostic)
+                proper_name = str(Path(temp_file.name).with_name(filename))
+                os.replace(temp_file.name, proper_name)
                 temp_files[-1] = proper_name  # Update the list with new name
                 candidate_files[proper_name] = file_type
 
