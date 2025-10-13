@@ -57,6 +57,9 @@ def test_provide_feedback_resolves_numeric_job_and_interactive(monkeypatch, tmp_
         base / "jobs" / "j1" / "job_description.txt"
     ).exists(), "Job description should exist"
 
+    # Re-set environment to ensure BASE_DATA_PATH points to the correct location
+    monkeypatch.setenv("BASE_DATA_PATH", str(base))
+
     runner = CliRunner()
 
     # list-jobs depends on actual jobs dir; we won't call it directly here
@@ -72,7 +75,7 @@ def test_provide_feedback_resolves_numeric_job_and_interactive(monkeypatch, tmp_
             "Prefilled feedback",
         ],
         input="y\n3\n\n",  # confirm candidate, select MAYBE (3), keep prefilled notes (Enter)
-        env={"BASE_DATA_PATH": str(base), "OPENAI_API_KEY": "sk-test-123"},
+        catch_exceptions=False,  # Let exceptions propagate for better debugging
     )
 
     assert result.exit_code == 0, result.output
@@ -84,6 +87,9 @@ def test_provide_feedback_accepts_accented_name_and_confirms(monkeypatch, tmp_pa
 
     # Verify the job directory structure was created
     assert (base / "jobs" / "j1").exists(), "Job directory should exist"
+
+    # Re-set environment to ensure BASE_DATA_PATH points to the correct location
+    monkeypatch.setenv("BASE_DATA_PATH", str(base))
 
     runner = CliRunner()
 
@@ -98,7 +104,7 @@ def test_provide_feedback_accepts_accented_name_and_confirms(monkeypatch, tmp_pa
             "Notes",
         ],
         input="y\n2\n\n",  # confirm candidate match, select YES (2), keep notes (Enter)
-        env={"BASE_DATA_PATH": str(base), "OPENAI_API_KEY": "sk-test-123"},
+        catch_exceptions=False,  # Let exceptions propagate for better debugging
     )
 
     # Should succeed with interactive prompts
