@@ -210,6 +210,9 @@ class FeedbackManager:
             print(f"❌ No candidates found for job {job_name}")
             return
 
+        # Clean up stale duplicate warnings before re-evaluation
+        self._cleanup_stale_duplicate_warnings(job_name)
+        
         re_evaluated = []
         skipped_rejected = []
         total_candidates = len(
@@ -439,22 +442,66 @@ class FeedbackManager:
         except (json.JSONDecodeError, KeyError):
             return None
 
+    def _cleanup_stale_duplicate_warnings(self, job_name: str) -> None:
+        """Remove duplicate warnings that reference non-existent candidates.
+        
+        Args:
+            job_name: Name of the job
+        """
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
+            return
+        
+        # Get list of all existing candidate names
+        existing_candidates = {
+            d.name for d in candidates_path.iterdir() if d.is_dir()
+        }
+        
+        removed_count = 0
+        for candidate_dir in candidates_path.iterdir():
+            if not candidate_dir.is_dir():
+                continue
+            
+            warning_path = candidate_dir / "DUPLICATE_WARNING.txt"
+            if warning_path.exists():
+                try:
+                    content = warning_path.read_text(encoding="utf-8")
+                    # Parse the referenced candidate name from the warning
+                    # Format: "This profile shares identifiers with: other_name"
+                    for line in content.splitlines():
+                        if "shares identifiers with:" in line:
+                            # Extract the other candidate name
+                            other_name = line.split("shares identifiers with:")[-1].strip()
+                            
+                            # Check if the other candidate still exists
+                            if other_name not in existing_candidates:
+                                # Remove the stale warning
+                                warning_path.unlink()
+                                removed_count += 1
+                                break
+                except (OSError, Exception):
+                    # If we can't read/parse the file, skip it
+                    pass
+        
+        if removed_count > 0:
+            print(f"   🧹 Cleaned up {removed_count} stale duplicate warning(s)")
+    
     def _is_candidate_rejected(self, job_name: str, candidate_name: str) -> bool:
         """Check if a candidate is marked as rejected.
-
+        
         Args:
             job_name: Name of the job
             candidate_name: Name of the candidate
-
+            
         Returns:
             True if candidate is rejected, False otherwise
         """
         candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
         meta_path = candidate_dir / "candidate_meta.json"
-
+        
         if not meta_path.exists():
             return False
-
+        
         try:
             with open(meta_path, "r", encoding="utf-8") as f:
                 meta = json.load(f)
