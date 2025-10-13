@@ -1,0 +1,20 @@
+# AI Job Candidate Reviewer - Dependencies
+# Core dependencies
+openai>=1.0.0
+python-dotenv>=1.0.0
+click>=8.0.0
+
+# File processing
+pypdf>=4.0.0  # Updated from deprecated PyPDF2
+# python-magic>=0.4.27  # Removed - not needed for basic file type detection
+
+# Data handling
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# Development
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0

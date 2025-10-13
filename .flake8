@@ -1,0 +1,27 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203,E501,W503,F401
+exclude = 
+    .git,
+    __pycache__,
+    .pytest_cache,
+    .coverage,
+    *.egg-info,
+    build,
+    dist,
+    .venv,
+    venv
+per-file-ignores =
+    __init__.py:F401
+    tests/*:S101,S106
+    file_processor.py:E402,C901
+    candidate_reviewer.py:C901,F541
+    feedback_manager.py:C901
+    output_generator.py:F541
+    test_typo_detection.py:F541
+max-complexity = 15
+
+# Philosophy: Readability over rigid rules
+# We ignore certain warnings when they conflict with code clarity:
+# - E402: Sometimes imports need to be after configuration
+# - C901: CLI handlers and file processors are naturally complex but readable

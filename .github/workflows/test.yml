@@ -1,0 +1,302 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-xdist flake8 black isort
+
+    - name: Create test directories
+      run: |
+        mkdir -p test_data/{intake,jobs,candidates,output}
+
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. Line length is set to 88 (black default)
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+    - name: Check code formatting with black
+      run: |
+        black --check --diff .
+
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff .
+
+    - name: Run unit tests
+      env:
+        # Set test environment variables (no real API keys)
+        BASE_DATA_PATH: ./test_data
+        INTAKE_PATH: ./test_data/intake
+        JOBS_PATH: ./test_data/jobs
+        CANDIDATES_PATH: ./test_data/candidates
+        OUTPUT_PATH: ./test_data/output
+        MAX_FILE_SIZE_MB: 2
+        OPENAI_MODEL: gpt-4
+        # Note: OPENAI_API_KEY is intentionally NOT set for security
+        # Tests that require API key validation will mock the configuration
+      run: |
+        # Run tests with coverage (excluding optional API integration tests)
+        python -m pytest tests/ -v --tb=short --cov=. --cov-report=xml --cov-report=term-missing -m "not api_integration"
+        
+    - name: Run integration tests separately
+      env:
+        BASE_DATA_PATH: ./test_data
+        INTAKE_PATH: ./test_data/intake
+        JOBS_PATH: ./test_data/jobs
+        CANDIDATES_PATH: ./test_data/candidates
+        OUTPUT_PATH: ./test_data/output
+        MAX_FILE_SIZE_MB: 2
+        OPENAI_MODEL: gpt-4
+      run: |
+        # Run integration tests
+        python -m pytest tests/integration/ -v --tb=short
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Security check - ensure no API keys in test output
+      run: |
+        # Check that no real API keys appear in test output or files
+        # Only flag keys that look real (>=20 chars after prefix). Allow short test tokens like "sk-test123".
+        if grep -REn "sk-[A-Za-z0-9]{20,}" tests/ --exclude-dir=__pycache__ >/dev/null || \
+           grep -REn "sk-proj-[A-Za-z0-9]{20,}" tests/ --exclude-dir=__pycache__ >/dev/null; then
+          echo "❌ SECURITY VIOLATION: Real API keys found in test files!"
+          echo "Please review SECURITY_TESTING_GUIDELINES.md"
+          exit 1
+        else
+          echo "✅ Security check passed: No real API keys found in tests"
+        fi
+
+  test-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install documentation dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Validate documentation
+      run: |
+        # Check that key documentation files exist
+        test -f README.md || (echo "❌ README.md missing" && exit 1)
+        test -f ARCHITECTURE.md || (echo "❌ ARCHITECTURE.md missing" && exit 1)
+        test -f GETTING_STARTED.md || (echo "❌ GETTING_STARTED.md missing" && exit 1)
+        test -f SECURITY_TESTING_GUIDELINES.md || (echo "❌ SECURITY_TESTING_GUIDELINES.md missing" && exit 1)
+        echo "✅ All required documentation files present"
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run security scan with bandit
+      run: |
+        pip install bandit[toml]
+        bandit -r . -f json -o bandit-report.json || true
+
+    - name: Check for hardcoded secrets
+      run: |
+        # Check for potential hardcoded secrets (excluding test mocks)
+        if grep -r "sk-[a-zA-Z0-9]\{20,\}" . --exclude-dir=.git --exclude="*.yml" --exclude="*.md" || \
+           grep -r "sk-proj-[a-zA-Z0-9]\{20,\}" . --exclude-dir=.git --exclude="*.yml" --exclude="*.md"; then
+          echo "❌ SECURITY ALERT: Potential hardcoded API keys found!"
+          echo "Please review and remove any real API keys from the codebase"
+          exit 1
+        else
+          echo "✅ No hardcoded secrets detected"
+        fi
+
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-scan-results
+        path: bandit-report.json
+
+  test-compatibility:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.11']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: Create test directories (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        mkdir -p test_data/{intake,jobs,candidates,output}
+
+    - name: Create test directories (Windows)
+      if: runner.os == 'Windows'
+      run: New-Item -ItemType Directory -Force -Path 'test_data\intake','test_data\jobs','test_data\candidates','test_data\output' | Out-Null
+
+    - name: Run core unit tests only
+      env:
+        BASE_DATA_PATH: ./test_data
+        MAX_FILE_SIZE_MB: 2
+      run: |
+        # Run only unit tests for compatibility check (skip integration tests)
+        python -m pytest tests/unit/ -v --tb=short
+
+  performance-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-benchmark
+
+    - name: Run performance tests
+      env:
+        BASE_DATA_PATH: ./test_data
+      run: |
+        # Create test data
+        mkdir -p test_data/{intake,jobs,candidates,output}
+        
+        # Run performance-focused tests
+        python -m pytest tests/unit/test_file_processor.py -v --tb=short
+        python -m pytest tests/unit/test_models.py -v --tb=short
+        
+        echo "✅ Performance tests completed"
+
+  # Optional: Real API Integration Tests (only run if API key is available)
+  api-integration-tests:
+    runs-on: ubuntu-latest
+    # Run on pushes to main in the source repo, and on PRs from branches in the same repo (not forks)
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'KjellKod') ||
+      (github.event_name == 'pull_request' && github.repository_owner == 'KjellKod' && github.event.pull_request.head.repo.fork == false)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: Create test directories
+      run: |
+        mkdir -p test_data/{intake,jobs,candidates,output}
+
+    - name: Run API integration tests
+      env:
+        BASE_DATA_PATH: ./test_data
+        INTAKE_PATH: ./test_data/intake
+        JOBS_PATH: ./test_data/jobs
+        CANDIDATES_PATH: ./test_data/candidates
+        OUTPUT_PATH: ./test_data/output
+        MAX_FILE_SIZE_MB: 2
+        # ⚠️  ONLY use for optional real API integration tests
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4' }}
+      run: |
+        # Only run tests marked as api_integration if API key is available
+        if [ -n "$OPENAI_API_KEY" ]; then
+          echo "🔑 Running real API integration tests..."
+          set +e
+          python -m pytest tests/ -v --tb=short -m "api_integration"
+          EXIT_CODE=$?
+          set -e
+          if [ $EXIT_CODE -eq 5 ]; then
+            echo "ℹ️  No tests marked 'api_integration' were collected. Skipping as success."
+            exit 0
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ API integration tests failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+        else
+          echo "⚠️  Skipping API integration tests - no API key available"
+          echo "This is normal for forks and most PRs"
+        fi
+
+  notify-on-failure:
+    runs-on: ubuntu-latest
+    needs: [test, test-docs, security-scan, test-compatibility]
+    if: failure()
+    steps:
+    - name: Notify on test failure
+      run: |
+        echo "❌ Test suite failed! Please check the following:"
+        echo "1. All unit tests pass"
+        echo "2. Code formatting follows black/isort standards"
+        echo "3. No security violations (API keys in tests)"
+        echo "4. Documentation files are present"
+        echo "5. Cross-platform compatibility maintained"
