@@ -26,7 +26,6 @@ known_first_party = ["ai_client", "candidate_reviewer", "config", "feedback_mana
 source = ["."]
 omit = [
     "tests/*",
-    "setup.py",
     "*/migrations/*",
     "*/venv/*",
     "*/.venv/*",
