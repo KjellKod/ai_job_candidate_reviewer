@@ -47,9 +47,15 @@ class OutputGenerator:
             evaluations, key=lambda e: e.overall_score, reverse=True
         )
 
+        # Prepare duplicate flags
+        duplicate_flags = self._load_duplicate_warnings(job_name)
+
         # Prepare CSV data
         csv_data = []
         for rank, evaluation in enumerate(sorted_evaluations, 1):
+            flags = []
+            if evaluation.candidate_name in duplicate_flags:
+                flags.append("DUPLICATE_IDENTIFIERS")
             csv_data.append(
                 {
                     "Rank": rank,
@@ -64,6 +70,7 @@ class OutputGenerator:
                         "%Y-%m-%d %H:%M:%S"
                     ),
                     "AI Insights Used": evaluation.ai_insights_used or "None",
+                    "Flags": ", ".join(flags) if flags else "",
                 }
             )
 
@@ -95,6 +102,9 @@ class OutputGenerator:
             evaluations, key=lambda e: e.overall_score, reverse=True
         )
 
+        # Load duplicate flags
+        duplicate_flags = self._load_duplicate_warnings(job_name)
+
         print(f"\n🎯 Candidate Rankings for: {job_name}")
         print("=" * 80)
 
@@ -119,7 +129,12 @@ class OutputGenerator:
             rec_color = self._get_recommendation_color(evaluation.recommendation)
             priority_icon = self._get_priority_icon(evaluation.interview_priority)
 
-            print(f"\n{rank}. {evaluation.candidate_name}")
+            dup_tag = (
+                " \U0001F6A8 DUPLICATE"
+                if evaluation.candidate_name in duplicate_flags
+                else ""
+            )
+            print(f"\n{rank}. {evaluation.candidate_name}{dup_tag}")
             print(
                 f"   Score: {evaluation.overall_score}/100 | {rec_color}{evaluation.recommendation.value}\033[0m | {priority_icon} {evaluation.interview_priority.value}"
             )
@@ -133,6 +148,12 @@ class OutputGenerator:
                 print(
                     f"   ⚠️  Concerns: {', '.join(evaluation.concerns[:2])}{'...' if len(evaluation.concerns) > 2 else ''}"
                 )
+
+            # If duplicate, print prominent warning with brief details
+            if evaluation.candidate_name in duplicate_flags:
+                snippet = duplicate_flags[evaluation.candidate_name]
+                if snippet:
+                    print(f"   🚨 Duplicate identifiers detected: {snippet}")
 
         print("\n" + "=" * 80)
 
@@ -485,6 +506,9 @@ class OutputGenerator:
         """
         stats = self.generate_summary_stats(evaluations)
 
+        # Load duplicate flags (by job name)
+        duplicate_flags = self._load_duplicate_warnings(job_context.name)
+
         html = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -508,6 +532,7 @@ class OutputGenerator:
         .strengths {{ color: #28a745; }}
         .concerns {{ color: #dc3545; }}
         ul {{ margin: 5px 0; }}
+        .duplicate-banner {{ background-color: #ffe3e3; color: #b00020; padding: 8px 12px; border-radius: 4px; margin: 8px 0; font-weight: bold; }}
     </style>
 </head>
 <body>
@@ -537,12 +562,21 @@ class OutputGenerator:
 
             html += f"""
     <div class="candidate">
-        <h3>{rank}. {evaluation.candidate_name}</h3>
+        <h3>{rank}. {evaluation.candidate_name}{' 🚨 DUPLICATE' if evaluation.candidate_name in duplicate_flags else ''}</h3>
         <p>
             <span class="score">Score: {evaluation.overall_score}/100</span> |
             <span class="recommendation {rec_class}">{evaluation.recommendation.value}</span> |
             <strong>Priority:</strong> {evaluation.interview_priority.value}
         </p>
+"""
+
+            # Add duplicate banner if applicable
+            if evaluation.candidate_name in duplicate_flags:
+                banner = duplicate_flags[evaluation.candidate_name]
+                html += f"""
+        <div class="duplicate-banner">
+            🚨 Duplicate identifiers detected. {banner}
+        </div>
 """
 
             if evaluation.strengths:
@@ -577,3 +611,31 @@ class OutputGenerator:
 """
 
         return html
+
+    def _load_duplicate_warnings(self, job_name: str) -> Dict[str, str]:
+        """Load duplicate warning snippets for all candidates in a job.
+
+        Returns a mapping: candidate_name -> short snippet from warning file.
+        """
+        flags: Dict[str, str] = {}
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
+            return flags
+        for candidate_dir in candidates_path.iterdir():
+            if not candidate_dir.is_dir():
+                continue
+            warning_path = candidate_dir / "DUPLICATE_WARNING.txt"
+            if warning_path.exists():
+                try:
+                    text = warning_path.read_text(encoding="utf-8").strip()
+                    # Try to extract one-line summary
+                    lines = [l.strip() for l in text.splitlines() if l.strip()]
+                    summary = (
+                        " ".join(lines[1:3])
+                        if len(lines) > 1
+                        else lines[0] if lines else ""
+                    )
+                    flags[candidate_dir.name] = summary
+                except OSError:
+                    flags[candidate_dir.name] = ""
+        return flags

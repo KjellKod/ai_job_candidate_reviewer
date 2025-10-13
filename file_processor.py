@@ -1,9 +1,11 @@
 """File processing for AI Job Candidate Reviewer."""
 
 import difflib
+import json
 import logging
 import os
 import re
+import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -14,6 +16,31 @@ logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 from config import Config
 from models import Candidate, CandidateFiles, JobContext, JobFiles
+
+# Regex patterns for extracting candidate identifiers
+EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+PHONE_RE = re.compile(
+    r"(?:\+?\d{1,3}[ .-]?)?(?:\(?\d{3}\)?|\d{3})[ .-]?\d{3}[ .-]?\d{4}\b"
+)
+LINKEDIN_RE = re.compile(
+    r"(?:https?://)?(?:www\.)?linkedin\.com/(?:in|pub|mwlite/in)/([A-Za-z0-9\-_%]+)",
+    re.I,
+)
+GITHUB_RE = re.compile(r"(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9\-]+)", re.I)
+
+
+def _normalize_profile_url(base: str, handle: str) -> str:
+    """Normalize profile URL to a canonical form.
+
+    Args:
+        base: Base URL (e.g., 'https://linkedin.com/in')
+        handle: User handle from the URL
+
+    Returns:
+        Normalized URL in lowercase
+    """
+    handle = urllib.parse.unquote(handle).strip().strip("/")
+    return f"{base}/{handle}".lower()
 
 
 class FileProcessor:
@@ -289,6 +316,9 @@ class FileProcessor:
     ) -> Tuple[Candidate, List[str]]:
         """Organize candidate files and create Candidate object.
 
+        Uses identity-based deduplication to detect and merge duplicate candidates
+        based on email, phone, LinkedIn, and GitHub identifiers.
+
         Args:
             candidate_files: CandidateFiles object with file paths
             job_name: Name of the job
@@ -298,13 +328,7 @@ class FileProcessor:
         """
         errors = []
 
-        # Create candidate directory
-        candidate_dir = self.config.get_candidate_path(
-            job_name, candidate_files.candidate_name
-        )
-        Path(candidate_dir).mkdir(parents=True, exist_ok=True)
-
-        # Extract resume text (required)
+        # Extract resume text (required) - but don't move file yet
         if not candidate_files.resume_path:
             errors.append(f"{candidate_files.candidate_name}: Resume is required")
             return (
@@ -318,12 +342,8 @@ class FileProcessor:
         if resume_error:
             errors.append(f"{candidate_files.candidate_name} resume: {resume_error}")
             resume_text = ""
-        else:
-            self._move_file_to_candidate_dir(
-                candidate_files.resume_path, candidate_dir, "resume"
-            )
 
-        # Extract cover letter (optional)
+        # Extract cover letter (optional) - but don't move file yet
         cover_letter = None
         if candidate_files.cover_letter_path:
             cover_text, cover_error = self.extract_text_from_file(
@@ -335,11 +355,8 @@ class FileProcessor:
                 )
             else:
                 cover_letter = cover_text
-                self._move_file_to_candidate_dir(
-                    candidate_files.cover_letter_path, candidate_dir, "cover_letter"
-                )
 
-        # Extract application (optional)
+        # Extract application (optional) - but don't move file yet
         application = None
         if candidate_files.application_path:
             app_text, app_error = self.extract_text_from_file(
@@ -351,12 +368,45 @@ class FileProcessor:
                 )
             else:
                 application = app_text
-                self._move_file_to_candidate_dir(
-                    candidate_files.application_path, candidate_dir, "application"
-                )
+
+        # Extract identifiers from all available text
+        combined_text = " ".join(
+            t for t in [resume_text, cover_letter or "", application or ""] if t
+        )
+        identifiers = self._extract_identifiers_from_text(combined_text)
+
+        # Check for existing candidates with overlapping identifiers
+        existing_candidates = self._load_all_candidate_metadata(job_name)
+
+        # Determine target directory based on identity matching
+        target_dir_path, final_candidate_name = self._determine_target_directory(
+            candidate_files.candidate_name, identifiers, existing_candidates, job_name
+        )
+
+        # Create target directory
+        Path(target_dir_path).mkdir(parents=True, exist_ok=True)
+
+        # Now move files to the determined target directory
+        if not resume_error and candidate_files.resume_path:
+            self._move_file_to_candidate_dir(
+                candidate_files.resume_path, target_dir_path, "resume"
+            )
+
+        if cover_letter and candidate_files.cover_letter_path:
+            self._move_file_to_candidate_dir(
+                candidate_files.cover_letter_path, target_dir_path, "cover_letter"
+            )
+
+        if application and candidate_files.application_path:
+            self._move_file_to_candidate_dir(
+                candidate_files.application_path, target_dir_path, "application"
+            )
+
+        # Save candidate metadata for future deduplication
+        self._save_candidate_metadata(target_dir_path, identifiers)
 
         candidate = Candidate(
-            name=candidate_files.candidate_name,
+            name=final_candidate_name,
             resume_text=resume_text,
             cover_letter=cover_letter,
             application=application,
@@ -364,6 +414,285 @@ class FileProcessor:
         )
 
         return candidate, errors
+
+    def _extract_identifiers_from_text(self, text: str) -> Dict[str, set]:
+        """Extract candidate identifiers from text.
+
+        Args:
+            text: Text to extract identifiers from (resume, cover letter, etc.)
+
+        Returns:
+            Dictionary with sets of emails, phones, linkedin, and github URLs
+        """
+        if not text:
+            return {
+                "emails": set(),
+                "phones": set(),
+                "linkedin": set(),
+                "github": set(),
+            }
+
+        # Extract emails (lowercase for comparison)
+        emails = set(m.group(0).lower() for m in EMAIL_RE.finditer(text))
+
+        # Extract phones (digits only for comparison)
+        phones = set(re.sub(r"\D", "", m.group(0)) for m in PHONE_RE.finditer(text))
+
+        # Extract LinkedIn profiles (normalized URLs)
+        linkedin = set()
+        for match in LINKEDIN_RE.finditer(text):
+            handle = match.group(1)
+            # Skip if handle is empty or too generic
+            if handle and len(handle) > 1:
+                linkedin.add(_normalize_profile_url("https://linkedin.com/in", handle))
+
+        # Extract GitHub profiles (normalized URLs)
+        github = set()
+        for match in GITHUB_RE.finditer(text):
+            handle = match.group(1)
+            # Skip if handle is empty or too generic
+            if handle and len(handle) > 1:
+                github.add(_normalize_profile_url("https://github.com", handle))
+
+        return {
+            "emails": emails,
+            "phones": phones,
+            "linkedin": linkedin,
+            "github": github,
+        }
+
+    def _save_candidate_metadata(
+        self, candidate_dir: str, identifiers: Dict[str, set]
+    ) -> None:
+        """Save candidate identifiers to metadata file.
+
+        Args:
+            candidate_dir: Path to candidate directory
+            identifiers: Dictionary of identifier sets
+        """
+        meta_path = Path(candidate_dir) / "candidate_meta.json"
+        # Convert sets to sorted lists for JSON serialization
+        serializable = {k: sorted(list(v)) for k, v in identifiers.items()}
+        meta_path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
+
+    def _load_all_candidate_metadata(self, job_name: str) -> List[Dict]:
+        """Load metadata for all existing candidates in a job.
+
+        Args:
+            job_name: Name of the job
+
+        Returns:
+            List of dictionaries with candidate name, dir, and identifier sets
+        """
+        job_candidates_dir = Path(self.config.candidates_path) / job_name
+        records = []
+
+        if not job_candidates_dir.exists():
+            return records
+
+        for cand_dir in job_candidates_dir.iterdir():
+            if not cand_dir.is_dir():
+                continue
+
+            meta_path = cand_dir / "candidate_meta.json"
+            if meta_path.exists():
+                try:
+                    data = json.loads(meta_path.read_text(encoding="utf-8"))
+                    # Convert lists back to sets
+                    record = {
+                        "name": cand_dir.name,
+                        "dir": str(cand_dir),
+                        "emails": set(data.get("emails", [])),
+                        "phones": set(data.get("phones", [])),
+                        "linkedin": set(data.get("linkedin", [])),
+                        "github": set(data.get("github", [])),
+                    }
+                    records.append(record)
+                except (json.JSONDecodeError, OSError):
+                    continue
+
+        return records
+
+    def _identifiers_overlap(self, a: Dict[str, set], b: Dict[str, set]) -> bool:
+        """Check if two identifier sets have any overlap.
+
+        Args:
+            a: First identifier dictionary
+            b: Second identifier dictionary
+
+        Returns:
+            True if any non-empty identifiers overlap, False otherwise
+        """
+        # Only count non-empty intersections; empty/empty does not match
+        for key in ["emails", "phones", "linkedin", "github"]:
+            a_set = a.get(key, set())
+            b_set = b.get(key, set())
+            if a_set and b_set and (a_set & b_set):
+                return True
+        return False
+
+    def _has_any_identifiers(self, identifiers: Dict[str, set]) -> bool:
+        """Check if identifier dictionary has at least one non-empty identifier.
+
+        Args:
+            identifiers: Dictionary of identifier sets
+
+        Returns:
+            True if any identifier set is non-empty
+        """
+        return any(
+            identifiers.get(key) for key in ["emails", "phones", "linkedin", "github"]
+        )
+
+    def _determine_target_directory(
+        self,
+        candidate_name: str,
+        identifiers: Dict[str, set],
+        existing_candidates: List[Dict],
+        job_name: str,
+    ) -> Tuple[str, str]:
+        """Determine the target directory for a candidate based on identity matching.
+
+        Args:
+            candidate_name: Name extracted from filename
+            identifiers: Extracted identifiers for this candidate
+            existing_candidates: List of existing candidate metadata
+            job_name: Name of the job
+
+        Returns:
+            Tuple of (target_directory_path, final_candidate_name)
+        """
+        # Check for candidates with overlapping identifiers
+        matching = [
+            rec
+            for rec in existing_candidates
+            if self._identifiers_overlap(identifiers, rec)
+        ]
+
+        if matching:
+            # Found at least one match with overlapping identifiers
+            first_match = matching[0]
+
+            if first_match["name"] != candidate_name:
+                # Different name but same identifiers - potential fake/duplicate
+                print(
+                    f"\n⚠️  DUPLICATE IDENTIFIERS DETECTED: Candidate '{candidate_name}' shares "
+                    f"identifiers with existing candidate '{first_match['name']}'"
+                )
+
+                # Show which identifiers overlap
+                overlaps = []
+                for key in ["emails", "phones", "linkedin", "github"]:
+                    overlap = identifiers.get(key, set()) & first_match.get(key, set())
+                    if overlap:
+                        overlaps.append(f"{key}: {', '.join(sorted(overlap))}")
+                overlap_text = (
+                    "; ".join(overlaps) if overlaps else "(details unavailable)"
+                )
+
+                print("   Creating separate directory (marked for review)...")
+
+                # Create a new directory with a duplicate check suffix
+                base_name = candidate_name
+                suffix = 2
+                new_name = f"{base_name}__DUPLICATE_CHECK"
+                new_path = self.config.get_candidate_path(job_name, new_name)
+                # Ensure uniqueness in case of multiple
+                while Path(new_path).exists():
+                    new_name = f"{base_name}__DUPLICATE_CHECK_{suffix}"
+                    new_path = self.config.get_candidate_path(job_name, new_name)
+                    suffix += 1
+
+                # Write duplicate warnings in BOTH directories for visibility
+                try:
+                    Path(new_path).mkdir(parents=True, exist_ok=True)
+                except OSError:
+                    pass
+                self._write_duplicate_warning(
+                    new_path,
+                    first_match["name"],
+                    overlap_text,
+                )
+                self._write_duplicate_warning(
+                    first_match["dir"],
+                    candidate_name,
+                    overlap_text,
+                )
+
+                return new_path, new_name
+            else:
+                # Same name and overlapping identifiers - legitimate duplicate
+                print(
+                    f"\n🔁 Merging duplicate files for '{candidate_name}' "
+                    f"(matching identifiers found)"
+                )
+
+            return first_match["dir"], first_match["name"]
+
+        # No identifier overlap found - check if name collision exists
+        same_name_candidates = [
+            rec for rec in existing_candidates if rec["name"] == candidate_name
+        ]
+
+        if same_name_candidates:
+            # Same name but no identifier overlap
+            existing = same_name_candidates[0]
+            has_new_ids = self._has_any_identifiers(identifiers)
+            has_existing_ids = self._has_any_identifiers(existing)
+
+            if has_new_ids and has_existing_ids:
+                # Both have identifiers but they don't overlap - likely different people
+                print(
+                    f"\n⚠️  NAME COLLISION: Found existing candidate '{candidate_name}' "
+                    f"with different identifiers"
+                )
+                print("   Creating new directory with suffix...")
+
+                # Find next available suffix
+                base_name = candidate_name
+                suffix = 2
+                while True:
+                    new_name = f"{base_name}__{suffix}"
+                    new_path = self.config.get_candidate_path(job_name, new_name)
+                    if not Path(new_path).exists():
+                        print(f"   New candidate directory: {new_name}")
+                        return new_path, new_name
+                    suffix += 1
+            else:
+                # At least one side has no identifiers - can't determine, use original
+                print(
+                    f"\n⚠️  NAME COLLISION: Candidate '{candidate_name}' already exists "
+                    f"but insufficient identifiers to determine if duplicate"
+                )
+                print("   Using original directory (files may be merged)...")
+                return existing["dir"], existing["name"]
+
+        # No match found - use original name
+        original_path = self.config.get_candidate_path(job_name, candidate_name)
+        return original_path, candidate_name
+
+    def _write_duplicate_warning(
+        self, candidate_dir: str, other_name: str, overlap_text: str
+    ) -> None:
+        """Write a prominent duplicate warning file into a candidate directory.
+
+        Args:
+            candidate_dir: Path to candidate directory
+            other_name: The other candidate name that shares identifiers
+            overlap_text: Human-readable list of overlapping identifiers
+        """
+        try:
+            warning_path = Path(candidate_dir) / "DUPLICATE_WARNING.txt"
+            content = (
+                "🚨 DUPLICATE IDENTIFIERS DETECTED\n"
+                f"This profile shares identifiers with: {other_name}\n"
+                f"Overlapping: {overlap_text}\n\n"
+                "Action: Review both profiles carefully. These candidates were processed separately "
+                "to avoid data loss, but may represent the same person or a fake/alias.\n"
+            )
+            warning_path.write_text(content, encoding="utf-8")
+        except OSError:
+            pass
 
     def _find_file_in_intake(self, base_name: str) -> Optional[str]:
         """Find a file in intake directory by base name.

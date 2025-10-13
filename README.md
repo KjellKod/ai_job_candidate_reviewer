@@ -28,6 +28,7 @@ Drop Files → AI Analysis → Ranked Results → Your Feedback → Improved Ran
 
 - **Structured evaluations** with scores (0-100) and recommendations
 - **Interview priorities** (HIGH/MEDIUM/LOW) to focus your time
+- **Smart duplicate detection** - Automatically identifies duplicate/fake candidates by email, phone, LinkedIn, and GitHub
 - **AI learning** from your feedback improves future screenings
 - **Multiple formats** - CSV reports and HTML summaries
 - **Privacy-first** - All data stays local, only candidate content goes to OpenAI
@@ -68,6 +69,7 @@ python3 candidate_reviewer.py test-connection
 
 **Going Further:**
 - [Advanced Features](#advanced-improve-results) - Fine-tune AI behavior
+- [Smart Duplicate Detection](#smart-duplicate-detection) - Automatic duplicate/fake candidate detection
 - [Troubleshooting](#troubleshooting) - Common issues
 - [Additional Resources](#additional-resources) - Detailed guides
 
@@ -441,6 +443,60 @@ Questionnaire red flags:
 ```
 
 This way the AI can evaluate both the resume/cover letter AND the questionnaire responses using your specific criteria. It helps catch candidates who look good on paper but give poor application answers, or vice versa.
+
+---
+
+## Smart Duplicate Detection
+
+The system automatically detects and handles duplicate candidates using identity-based matching. This protects you from:
+- **Duplicate submissions** - Same person submitting multiple times
+- **Fake candidates** - Different names but same contact information
+- **Name collisions** - Different people with the same name
+
+### How It Works
+
+When processing candidates, the system extracts and compares:
+- **Email addresses** (e.g., `john.doe@example.com`)
+- **Phone numbers** (e.g., `555-123-4567`)
+- **LinkedIn profiles** (e.g., `linkedin.com/in/johndoe`)
+- **GitHub profiles** (e.g., `github.com/johndoe`)
+
+### Duplicate Scenarios
+
+**1. Same name + matching identifiers:**
+```
+✅ Legitimate duplicate - files merged into existing candidate
+🔁 Merging duplicate files for 'john_doe' (matching identifiers found)
+```
+
+**2. Different names + matching identifiers:**
+```
+⚠️  Potential fake detected - processed separately and clearly flagged
+⚠️  DUPLICATE IDENTIFIERS: 'jane_smith' shares identifiers with 'john_doe'
+   Action: Created 'jane_smith__DUPLICATE_CHECK' with warning file
+   Overlapping identifiers: emails: john@example.com; phones: 5551234567
+```
+
+**3. Same name + different identifiers:**
+```
+⚠️  Different people with same name - separate directories created
+⚠️  NAME COLLISION: Found existing 'john_doe' with different identifiers
+   New candidate directory: john_doe__2
+```
+
+### What Gets Saved
+
+Each candidate gets a `candidate_meta.json` file storing their identifiers for future duplicate checks. If different names share identifiers, the second profile is created as `{name}__DUPLICATE_CHECK[_N]` and both profiles get a `DUPLICATE_WARNING.txt` file with overlap details. This is automatic—no action needed during intake.
+
+### Privacy Note
+
+Identifiers are extracted from resume/cover letter/application text you provide and stored locally. They're never sent to OpenAI separately—only as part of the full candidate documents during evaluation.
+
+### How Flags Appear in Reports
+
+- Terminal ranking: Candidates are tagged with "🚨 DUPLICATE" and a short reason line is printed.
+- CSV output: A new "Flags" column includes "DUPLICATE_IDENTIFIERS" when applicable.
+- HTML report: Candidate headers append "🚨 DUPLICATE" and a red banner summarizes the issue.
 
 ---
 

@@ -18,7 +18,7 @@
 
 | File | Purpose |
 |------|---------|
-| `tests/unit/` | Unit tests (18 tests passing) |
+| `tests/unit/` | Unit tests (73 tests passing) |
 | `tests/integration/` | Integration tests |
 | `CLAUDE_AGENT_DOCUMENT.md` | Complete system architecture document |
 | `GETTING_STARTED.md` | Quick start guide |
@@ -89,5 +89,55 @@ User Input → Config → Connection Tester → AI Client → File Processor →
 3. **AI Client** uses selected model for evaluations
 4. **File Processor** handles PDF extraction and organization
 5. **Output Generator** creates CSV, HTML, and terminal displays
+
+## Identity-Based Duplicate Detection
+
+### Design
+
+The system implements content-aware deduplication during candidate intake using identity matching rather than just filename comparison.
+
+### Components
+
+**Identifier Extraction** (`file_processor.py`):
+- Regex patterns extract: emails, phone numbers, LinkedIn profiles, GitHub profiles
+- Identifiers normalized for comparison (lowercase emails, digits-only phones, canonical URLs)
+- Handles multiple identifiers per candidate
+
+**Metadata Persistence**:
+- Each candidate directory contains `candidate_meta.json` with extracted identifiers
+- Metadata loaded at intake time to check for existing candidates
+- Enables cross-batch duplicate detection
+
+**Deduplication Logic** (`_determine_target_directory`):
+
+| Scenario | Identifiers Overlap? | Action |
+|----------|---------------------|--------|
+| Same name, matching IDs | ✅ Yes | Merge into existing directory |
+| Different names, matching IDs | ✅ Yes | Flag as potential fake, create `{name}__DUPLICATE_CHECK` and warn |
+| Same name, no overlap | ❌ No (both have IDs) | Create `name__2` directory |
+| Same name, no overlap | ❌ No (missing IDs) | Use existing directory |
+| No existing match | - | Create new directory |
+
+### Benefits
+
+- **Prevents duplicate processing** of same candidate
+- **Detects fake candidates** using different names with same contact info (without merging by default)
+- **Handles name collisions** intelligently (different people with same name)
+- **No false positives** - empty identifiers don't match
+
+### Privacy
+
+All identifier extraction happens locally. Identifiers are:
+- Extracted from user-provided documents
+- Stored in local `candidate_meta.json` files
+- Never sent to OpenAI separately (only as part of full document text)
+
+### Reporting Integration
+
+- The intake step writes `DUPLICATE_WARNING.txt` into both involved profiles when identifiers overlap across different names
+- `output_generator.py` reads these warnings and:
+  - Adds "🚨 DUPLICATE" tag in terminal output with a short summary
+  - Adds a "Flags" column in CSV with `DUPLICATE_IDENTIFIERS`
+  - Adds a red banner in HTML per affected candidate with the warning summary
 
 This architecture ensures clean separation of concerns while maintaining ease of use and debugging capabilities.
