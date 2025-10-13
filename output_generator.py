@@ -558,7 +558,17 @@ class OutputGenerator:
         Returns:
             HTML content string
         """
-        stats = self.generate_summary_stats(evaluations)
+        # Split into active and rejected for clearer presentation
+        active_evaluations: List[Evaluation] = []
+        rejected_evaluations: List[Evaluation] = []
+        for ev in evaluations:
+            if self._is_candidate_rejected(job_context.name, ev.candidate_name):
+                rejected_evaluations.append(ev)
+            else:
+                active_evaluations.append(ev)
+
+        # Stats only for active candidates
+        stats = self.generate_summary_stats(active_evaluations)
 
         # Load duplicate flags (by job name)
         duplicate_flags = self._load_duplicate_warnings(job_context.name)
@@ -611,7 +621,7 @@ class OutputGenerator:
 
         html += "<h3>Candidate Evaluations</h3>"
 
-        for rank, evaluation in enumerate(evaluations, 1):
+        for rank, evaluation in enumerate(active_evaluations, 1):
             rec_class = evaluation.recommendation.value.lower().replace("_", "-")
 
             html += f"""
@@ -655,6 +665,38 @@ class OutputGenerator:
 
             html += f"""
         <p><strong>Detailed Notes:</strong> {evaluation.detailed_notes}</p>
+        <p><small><strong>Evaluated:</strong> {evaluation.timestamp.strftime("%Y-%m-%d %H:%M:%S")}</small></p>
+    </div>
+"""
+
+        # Rejected section
+        if rejected_evaluations:
+            html += """
+    <hr/>
+    <h3>🚫 Rejected Candidates</h3>
+    <p>The following candidates have been rejected and are excluded from evaluation rankings.</p>
+"""
+            # Sort rejected by score descending for consistency
+            rejected_sorted = sorted(
+                rejected_evaluations, key=lambda e: e.overall_score, reverse=True
+            )
+            for evaluation in rejected_sorted:
+                info = self._get_rejection_info(
+                    job_context.name, evaluation.candidate_name
+                )
+                reason = (
+                    info.get("reason", "No reason provided")
+                    if info
+                    else "No reason provided"
+                )
+                html += f"""
+    <div class="candidate">
+        <h3>{evaluation.candidate_name}</h3>
+        <p>
+            <span class=\"score\">Score: {evaluation.overall_score}/100</span> |
+            <span class=\"recommendation {evaluation.recommendation.value.lower().replace('_','-')}\">{evaluation.recommendation.value}</span>
+        </p>
+        <p><strong>Reason:</strong> {reason}</p>
         <p><small><strong>Evaluated:</strong> {evaluation.timestamp.strftime("%Y-%m-%d %H:%M:%S")}</small></p>
     </div>
 """
