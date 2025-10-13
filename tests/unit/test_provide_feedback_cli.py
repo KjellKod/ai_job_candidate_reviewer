@@ -51,8 +51,11 @@ def _chdir_tmp(monkeypatch, tmp_path):
 def test_provide_feedback_resolves_numeric_job_and_interactive(monkeypatch, tmp_path):
     base = _setup_minimal_job(tmp_path)
 
-    # Point config paths to tmp data directory by env variables if supported
-    # Otherwise rely on default ./data with our chdir
+    # Verify the job directory structure was created
+    assert (base / "jobs" / "j1").exists(), "Job directory should exist"
+    assert (
+        base / "jobs" / "j1" / "job_description.txt"
+    ).exists(), "Job description should exist"
 
     runner = CliRunner()
 
@@ -69,6 +72,7 @@ def test_provide_feedback_resolves_numeric_job_and_interactive(monkeypatch, tmp_
             "Prefilled feedback",
         ],
         input="y\n3\n\n",  # confirm candidate, select MAYBE (3), keep prefilled notes (Enter)
+        env={"BASE_DATA_PATH": str(base), "OPENAI_API_KEY": "sk-test-123"},
     )
 
     assert result.exit_code == 0, result.output
@@ -77,6 +81,10 @@ def test_provide_feedback_resolves_numeric_job_and_interactive(monkeypatch, tmp_
 
 def test_provide_feedback_accepts_accented_name_and_confirms(monkeypatch, tmp_path):
     base = _setup_minimal_job(tmp_path)
+
+    # Verify the job directory structure was created
+    assert (base / "jobs" / "j1").exists(), "Job directory should exist"
+
     runner = CliRunner()
 
     # Use human-readable name with spaces/accents that maps to john_doe
@@ -90,6 +98,7 @@ def test_provide_feedback_accepts_accented_name_and_confirms(monkeypatch, tmp_pa
             "Notes",
         ],
         input="y\n2\n\n",  # confirm candidate match, select YES (2), keep notes (Enter)
+        env={"BASE_DATA_PATH": str(base), "OPENAI_API_KEY": "sk-test-123"},
     )
 
     # Should succeed with interactive prompts
