@@ -1245,9 +1245,14 @@ class CandidateReviewer:
             typed = input("Press Enter to keep, or type new notes to replace: ").strip()
             feedback_notes = typed if typed else feedback_text
         else:
-            if human_recommendation in [RecommendationType.NO, RecommendationType.STRONG_NO]:
+            if human_recommendation in [
+                RecommendationType.NO,
+                RecommendationType.STRONG_NO,
+            ]:
                 while True:
-                    feedback_notes = input("\n⚠️  Please explain why this is a NO/STRONG_NO (required): ").strip()
+                    feedback_notes = input(
+                        "\n⚠️  Please explain why this is a NO/STRONG_NO (required): "
+                    ).strip()
                     if feedback_notes:
                         break
                     print("❌ Feedback notes are required for negative recommendations")
@@ -1280,7 +1285,9 @@ class CandidateReviewer:
                     rejection_input = input(
                         f"Rejection reason (press Enter to reuse your feedback notes): "
                     ).strip()
-                    rejection_reason = rejection_input if rejection_input else feedback_notes
+                    rejection_reason = (
+                        rejection_input if rejection_input else feedback_notes
+                    )
                     should_reject = True
             except KeyboardInterrupt:
                 print("\n(Skipping permanent rejection)")
