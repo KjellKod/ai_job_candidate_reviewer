@@ -89,6 +89,7 @@ class AIClient:
                 job_name=job_context.name,
                 overall_score=evaluation_data.get("overall_score", 0),
                 recommendation=RecommendationType(
+                    # standard Python dictionary pattern for safe retrieval with a default of "no"
                     evaluation_data.get("recommendation", "NO")
                 ),
                 strengths=evaluation_data.get("strengths", []),
