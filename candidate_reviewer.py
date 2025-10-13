@@ -1318,6 +1318,29 @@ class CandidateReviewer:
                 print(f"\n🚫 {candidate_name} has been permanently rejected")
                 print(f"   Reason: {rejection_reason}")
                 print("   (This candidate will be excluded from future re-evaluations)")
+                # Always regenerate reports after feedback (even without re-evaluation)
+                try:
+                    from output_generator import OutputGenerator
+
+                    output_gen = OutputGenerator(self.config)
+                    # Load current evaluations (includes current rejection status in CSV/HTML via status column/section)
+                    evaluations = output_gen.load_evaluations_for_job(job_name)
+                    output_path = self.config.get_output_path(job_name)
+                    # Generate CSV
+                    output_gen.generate_csv(evaluations, output_path, job_name)
+                    # Generate HTML only if job context is available
+                    try:
+                        job_context = self.feedback_manager._load_job_context(job_name)
+                        if job_context:
+                            output_gen.generate_html_report(
+                                job_context, evaluations, output_path
+                            )
+                    except Exception:
+                        # Skip HTML generation if job context isn't available
+                        pass
+                    print("\n📊 Reports updated to reflect latest feedback")
+                except Exception as rg_err:
+                    print(f"\n⚠️  Could not regenerate reports: {rg_err}")
                 # Don't re-evaluate rejected candidates
                 return
 

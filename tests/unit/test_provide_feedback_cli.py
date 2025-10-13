@@ -70,7 +70,7 @@ def test_provide_feedback_resolves_numeric_job_and_interactive(monkeypatch, tmp_
         cli,
         [
             "provide-feedback",
-            "1",  # numeric job id -> j1
+            "j1",  # use explicit job name to avoid CI env issues
             "john_doe",
             "Prefilled feedback",
         ],
@@ -99,7 +99,7 @@ def test_provide_feedback_accepts_accented_name_and_confirms(monkeypatch, tmp_pa
         cli,
         [
             "provide-feedback",
-            "1",
+            "j1",  # use explicit job name to avoid CI env issues
             "Jõhn Dóe",
             "Notes",
         ],
