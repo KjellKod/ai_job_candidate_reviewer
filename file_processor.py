@@ -17,7 +17,10 @@ from models import Candidate, CandidateFiles, JobContext, JobFiles
 
 
 class FileProcessor:
-    """Handle file intake, organization, and text extraction."""
+    """
+    Handle file intake, organization, and text extraction.
+    Think of this class as the intake clerk + document scanner + file librarian for the AI system.
+    """
 
     def __init__(self, config: Config, interactive: bool = True):
         """Initialize file processor.
