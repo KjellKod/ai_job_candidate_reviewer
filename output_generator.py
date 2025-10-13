@@ -130,7 +130,7 @@ class OutputGenerator:
             priority_icon = self._get_priority_icon(evaluation.interview_priority)
 
             dup_tag = (
-                " \U0001F6A8 DUPLICATE"
+                " \U0001f6a8 DUPLICATE"
                 if evaluation.candidate_name in duplicate_flags
                 else ""
             )
