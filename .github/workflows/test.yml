@@ -271,7 +271,17 @@ jobs:
         # Only run tests marked as api_integration if API key is available
         if [ -n "$OPENAI_API_KEY" ]; then
           echo "🔑 Running real API integration tests..."
+          set +e
           python -m pytest tests/ -v --tb=short -m "api_integration"
+          EXIT_CODE=$?
+          set -e
+          if [ $EXIT_CODE -eq 5 ]; then
+            echo "ℹ️  No tests marked 'api_integration' were collected. Skipping as success."
+            exit 0
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ API integration tests failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
         else
           echo "⚠️  Skipping API integration tests - no API key available"
           echo "This is normal for forks and most PRs"
