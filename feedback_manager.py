@@ -187,11 +187,12 @@ class FeedbackManager:
             job_name: Name of the job
             candidate_names: Optional list of specific candidates to re-evaluate
         """
-        # Load job insights
+        # Load job insights (optional)
         job_insights = self._load_job_insights(job_name)
         if not job_insights:
-            print(f"⚠️  No insights available for {job_name}. Generate insights first.")
-            return
+            print(
+                f"⚠️  No insights available for {job_name}. Re-evaluating without insights."
+            )
 
         # Load job context
         job_context = self._load_job_context(job_name)
@@ -229,22 +230,48 @@ class FeedbackManager:
                 if not candidate:
                     continue
 
-                # Re-evaluate with insights
+                # Re-evaluate (conditionally with insights)
+                applied_insights = bool(job_insights)
                 print(
-                    f"🔄 Re-evaluating {candidate_name} ({current_count}/{total_candidates}) with updated insights..."
+                    f"🔄 Re-evaluating {candidate_name} ({current_count}/{total_candidates}) "
+                    + (
+                        "with insights..."
+                        if applied_insights
+                        else "without insights..."
+                    )
                 )
+
+                # Load previous evaluation for delta display
+                prev_eval_path = candidate_dir / "evaluation.json"
+                previous_score = None
+                if prev_eval_path.exists():
+                    try:
+                        with open(prev_eval_path, "r", encoding="utf-8") as f:
+                            prev_data = json.load(f)
+                            previous_score = prev_data.get("overall_score")
+                    except Exception:
+                        previous_score = None
                 evaluation = self.ai_client.evaluate_candidate(
-                    job_context, candidate, job_insights.generated_insights
+                    job_context,
+                    candidate,
+                    job_insights.generated_insights if job_insights else None,
                 )
 
                 # Save new evaluation (keep history)
                 self._save_evaluation_with_history(candidate_dir, evaluation)
                 re_evaluated.append(candidate_name)
 
-                print(
-                    f"✅ Re-evaluated {candidate_name} "
-                    f"(Score: {evaluation.overall_score}/100)"
-                )
+                # Report delta if previous score available
+                if previous_score is not None:
+                    delta = evaluation.overall_score - int(previous_score)
+                    sign = "+" if delta >= 0 else ""
+                    print(
+                        f"✅ Re-evaluated {candidate_name} (was {previous_score} → now {evaluation.overall_score} | Δ {sign}{delta})"
+                    )
+                else:
+                    print(
+                        f"✅ Re-evaluated {candidate_name} (Score: {evaluation.overall_score}/100)"
+                    )
 
         if re_evaluated:
             print(

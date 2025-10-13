@@ -3,8 +3,10 @@
 
 import json
 import os
+import re
 import sys
 import time
+import unicodedata
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -136,6 +138,165 @@ class CandidateReviewer:
                 print(f"   {i}. {name}")
             return None
         return job_identifier
+
+    def _normalize_candidate_key(self, name: str) -> str:
+        """Create a normalized key for comparing candidate identifiers.
+
+        The normalization removes accents, lowercases, and replaces non-alphanumerics
+        with underscores, collapsing consecutive underscores.
+        """
+        if not name:
+            return ""
+        # Remove accents
+        no_accents = (
+            unicodedata.normalize("NFKD", name)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+        lowered = no_accents.lower()
+        # Replace separators with underscores
+        replaced = re.sub(r"[^a-z0-9]+", "_", lowered)
+        # Collapse multiple underscores
+        collapsed = re.sub(r"_+", "_", replaced).strip("_")
+        return collapsed
+
+    def _list_job_candidates(self, job_name: str) -> list[str]:
+        from pathlib import Path
+
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
+            return []
+        return sorted([p.name for p in candidates_path.iterdir() if p.is_dir()])
+
+    def _resolve_candidate_identifier(
+        self, job_name: str, candidate_identifier: str, confirm: bool = True
+    ) -> Optional[str]:
+        """Resolve candidate identifier which may be index or human-readable name.
+
+        - If numeric, select Nth candidate (1-based) from sorted list.
+        - Otherwise, try exact dir match, then normalized match, then fuzzy match.
+        - Optionally confirm mapping interactively when a non-exact match is used.
+        """
+        # Prefer ranking order (as displayed in show-candidates) when available
+        try:
+            evaluations = self.output_generator.load_evaluations_for_job(
+                job_name, silent=True
+            )
+            if evaluations:
+                # Sort by score descending to match display order
+                evaluations = sorted(
+                    evaluations, key=lambda e: e.overall_score, reverse=True
+                )
+                ranked_candidates = [e.candidate_name for e in evaluations]
+            else:
+                ranked_candidates = self._list_job_candidates(job_name)
+        except Exception:
+            ranked_candidates = self._list_job_candidates(job_name)
+
+        candidates = ranked_candidates
+        if not candidates:
+            return None
+
+        # Numeric index selection
+        if candidate_identifier.isdigit():
+            idx = int(candidate_identifier)
+            if 1 <= idx <= len(candidates):
+                resolved = candidates[idx - 1]
+                if confirm:
+                    try:
+                        ans = (
+                            input(
+                                f"Did you mean candidate #{idx}: '{resolved}'? (y/N): "
+                            )
+                            .strip()
+                            .lower()
+                        )
+                        if ans not in ("y", "yes"):
+                            print("❌ Selection cancelled")
+                            return None
+                    except KeyboardInterrupt:
+                        print("\n❌ Selection cancelled")
+                        return None
+                return resolved
+            else:
+                print(f"❌ Invalid candidate number: {candidate_identifier}")
+                print("📋 Available candidates:")
+                for i, c in enumerate(candidates, start=1):
+                    print(f"   {i}. {c}")
+                return None
+
+        # Exact directory name match
+        if candidate_identifier in candidates:
+            return candidate_identifier
+
+        # Normalized match
+        target_key = self._normalize_candidate_key(candidate_identifier)
+        name_to_key = {c: self._normalize_candidate_key(c) for c in candidates}
+
+        # Exact normalized equality
+        for dir_name, key in name_to_key.items():
+            if key == target_key:
+                if confirm and dir_name != candidate_identifier:
+                    try:
+                        ans = (
+                            input(
+                                f"Found '{dir_name}' matching '{candidate_identifier}'. Proceed? (y/N): "
+                            )
+                            .strip()
+                            .lower()
+                        )
+                        if ans not in ("y", "yes"):
+                            print("❌ Selection cancelled")
+                            return None
+                    except KeyboardInterrupt:
+                        print("\n❌ Selection cancelled")
+                        return None
+                return dir_name
+
+        # Fuzzy match using difflib
+        try:
+            import difflib
+
+            keys = list(name_to_key.values())
+            matches = difflib.get_close_matches(target_key, keys, n=3, cutoff=0.7)
+            if matches:
+                # Map back to dir names preserving order
+                candidates_by_score = []
+                for m in matches:
+                    for dir_name, key in name_to_key.items():
+                        if key == m:
+                            ratio = difflib.SequenceMatcher(
+                                None, target_key, key
+                            ).ratio()
+                            candidates_by_score.append((ratio, dir_name))
+                candidates_by_score.sort(reverse=True)
+                top = [d for _r, d in candidates_by_score]
+
+                if confirm:
+                    print("\nDid you mean one of these candidates?")
+                    for i, d in enumerate(top, start=1):
+                        print(f"   {i}. {d}")
+                    try:
+                        sel = input(
+                            "Enter number to select, or press Enter to cancel: "
+                        ).strip()
+                        if not sel:
+                            print("❌ Selection cancelled")
+                            return None
+                        if sel.isdigit() and 1 <= int(sel) <= len(top):
+                            return top[int(sel) - 1]
+                        print("❌ Invalid selection")
+                        return None
+                    except KeyboardInterrupt:
+                        print("\n❌ Selection cancelled")
+                        return None
+                else:
+                    # Non-interactive: pick best match
+                    return top[0]
+        except Exception:
+            pass
+
+        return None
 
     def setup_job(self, job_name: str, allow_update: bool = False) -> JobSetupResult:
         """Initialize or update job with description files from intake.
@@ -872,18 +1033,28 @@ class CandidateReviewer:
             print("❌ Could not fetch available models")
 
     def provide_feedback(
-        self, job_name: str, candidate_name: str, feedback_text: Optional[str] = None
+        self,
+        job_name: str,
+        candidate_name: str,
+        feedback_text: Optional[str] = None,
     ) -> None:
-        """Provide feedback on a candidate evaluation."""
+        """Provide feedback on a candidate evaluation.
+
+        Interactive feedback collection.
+        """
         if not self.feedback_manager:
             print("❌ Feedback system not available (API key required)")
             return
 
-        # Check if candidate exists
-        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
-        if not candidate_dir.exists():
+        # Resolve candidate (accept index, accented/space name, or dir name)
+        resolved_candidate = self._resolve_candidate_identifier(
+            job_name, candidate_name, confirm=True
+        )
+        if not resolved_candidate:
             print(f"❌ Candidate {candidate_name} not found in job {job_name}")
             return
+        candidate_name = resolved_candidate
+        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
 
         # Load current evaluation
         eval_path = candidate_dir / "evaluation.json"
@@ -907,107 +1078,57 @@ class CandidateReviewer:
             f"   Concerns: {', '.join(evaluation.concerns[:2])}{'...' if len(evaluation.concerns) > 2 else ''}"
         )
 
-        # Handle non-interactive feedback if provided
+        # Interactive feedback collection
+        print("\n🤔 Please provide your feedback:")
+
+        # Get advisory human recommendation (guidance only; does not override AI)
+        print(
+            "\nAdvisory recommendation (guidance only; does not override AI scoring):"
+        )
+        print("Choose the option that best reflects your judgment.")
+        print("1. STRONG_YES - Definitely hire")
+        print("2. YES - Good candidate, should interview")
+        print("3. MAYBE - Borderline, needs more evaluation")
+        print("4. NO - Not a good fit")
+        print("5. STRONG_NO - Definitely reject")
+
+        while True:
+            try:
+                choice = input("Enter choice (1-5): ").strip()
+                rec_map = {
+                    "1": RecommendationType.STRONG_YES,
+                    "2": RecommendationType.YES,
+                    "3": RecommendationType.MAYBE,
+                    "4": RecommendationType.NO,
+                    "5": RecommendationType.STRONG_NO,
+                }
+                if choice in rec_map:
+                    human_recommendation = rec_map[choice]
+                    break
+                else:
+                    print("Please enter 1, 2, 3, 4, or 5")
+            except KeyboardInterrupt:
+                print("\n❌ Feedback cancelled")
+                return
+
+        # Do not prompt for score; the system will infer from feedback over time
+        human_score = None
+
+        # Get feedback notes
         if feedback_text:
-            print(f"\n🤔 Processing feedback: {feedback_text}")
-
-            # Auto-determine recommendation based on feedback sentiment
-            feedback_lower = feedback_text.lower()
-            if any(
-                word in feedback_lower
-                for word in ["poor", "bad", "terrible", "awful", "reject", "no"]
-            ):
-                human_recommendation = RecommendationType.NO
-                human_score = 40  # Low score for negative feedback
-            elif any(
-                word in feedback_lower
-                for word in ["excellent", "great", "perfect", "hire", "strong"]
-            ):
-                human_recommendation = RecommendationType.YES
-                human_score = 90  # High score for positive feedback
-            else:
-                human_recommendation = RecommendationType.MAYBE
-                human_score = 65  # Medium score for neutral feedback
-
-            feedback_notes = feedback_text
-            corrections = {}
-
-            # Auto-add corrections for common issues
-            if "english" in feedback_lower or "grammar" in feedback_lower:
-                corrections["concerns"] = (
-                    f"{', '.join(evaluation.concerns)}, "
-                    f"Poor written English with grammatical mistakes"
-                )
-                corrections["overall_score"] = str(human_score)
-
+            print("\n📌 Prefilled notes detected (from pasted argument or --notes):")
+            print("-" * 60)
+            print(feedback_text)
+            print("-" * 60)
+            typed = input("Press Enter to keep, or type new notes to replace: ").strip()
+            feedback_notes = typed if typed else feedback_text
         else:
-            # Interactive feedback collection
-            print("\n🤔 Please provide your feedback:")
-
-            # Get human recommendation
-            print("\nWhat is your recommendation for this candidate?")
-            print("1. STRONG_YES - Definitely hire")
-            print("2. YES - Good candidate, should interview")
-            print("3. MAYBE - Borderline, needs more evaluation")
-            print("4. NO - Not a good fit")
-            print("5. STRONG_NO - Definitely reject")
-
-            while True:
-                try:
-                    choice = input("Enter choice (1-5): ").strip()
-                    rec_map = {
-                        "1": RecommendationType.STRONG_YES,
-                        "2": RecommendationType.YES,
-                        "3": RecommendationType.MAYBE,
-                        "4": RecommendationType.NO,
-                        "5": RecommendationType.STRONG_NO,
-                    }
-                    if choice in rec_map:
-                        human_recommendation = rec_map[choice]
-                        break
-                    else:
-                        print("Please enter 1, 2, 3, 4, or 5")
-                except KeyboardInterrupt:
-                    print("\n❌ Feedback cancelled")
-                    return
-
-            # Get human score (optional)
-            human_score = None
-            score_input = input(
-                "\nOptional: Provide a score 0-100 (or press Enter to skip): "
-            ).strip()
-            if score_input:
-                try:
-                    human_score = max(0, min(100, int(score_input)))
-                except ValueError:
-                    print("Invalid score, skipping...")
-
-            # Get feedback notes
             feedback_notes = input("\nPlease explain your reasoning: ").strip()
             if not feedback_notes:
                 feedback_notes = "No additional notes provided"
 
-            # Get specific corrections
-            corrections = {}
-            print(
-                "\nAny specific corrections to the AI evaluation? (press Enter when done)"
-            )
-            print("Format: field_name: corrected_value")
-            print("Example: overall_score: 65")
-            print(
-                "Available fields: overall_score, strengths, concerns, detailed_notes"
-            )
-
-            while True:
-                correction = input("Correction (or Enter to finish): ").strip()
-                if not correction:
-                    break
-
-                if ":" in correction:
-                    field, value = correction.split(":", 1)
-                    corrections[field.strip()] = value.strip()
-                else:
-                    print("Format: field_name: corrected_value")
+        # Do not collect field-level corrections; rely on notes and recommendation
+        corrections = {}
 
         # Create feedback object
         from models import HumanFeedback
@@ -1024,6 +1145,34 @@ class CandidateReviewer:
         try:
             self.feedback_manager.collect_feedback(job_name, candidate_name, feedback)
             print("\n✅ Feedback saved successfully!")
+
+            # Immediately re-evaluate this candidate to reflect guidance
+            print(
+                "\n🔄 Re-evaluating candidate with your guidance (and insights if available)..."
+            )
+            try:
+                # Trigger re-evaluation for only this candidate
+                self.feedback_manager.trigger_re_evaluation(job_name, [candidate_name])
+            except Exception as ree:
+                print(f"⚠️  Could not re-evaluate candidate: {ree}")
+
+            # Final guidance message
+            print(
+                "\nℹ️  To update scoring for this and other candidates after changing job criteria:"
+            )
+            print(
+                "   1) Edit job files in data/jobs/{}/: job_description.*, ideal_candidate.txt, warning_flags.txt".format(
+                    job_name
+                )
+            )
+            print(
+                "   2) (Optional) Generate insights once you have feedback (minimum 2+ candidates):"
+            )
+            print(
+                "      python3 candidate_reviewer.py show-insights {}".format(job_name)
+            )
+            print("   3) Re-evaluate candidates with updated insights:")
+            print("      python3 candidate_reviewer.py re-evaluate {}".format(job_name))
         except Exception as e:
             print(f"\n❌ Error saving feedback: {e}")
 
@@ -1501,9 +1650,13 @@ def cli(ctx):
         click.echo("  python3 candidate_reviewer.py process-candidates 'job_name'")
         click.echo("  python3 candidate_reviewer.py show-candidates 'job_name'")
         click.echo(
-            "  python3 candidate_reviewer.py provide-feedback 'job_name' 'candidate_name' 'feedback'"
+            "  python3 candidate_reviewer.py provide-feedback 'job_name' 'candidate_name_or_index' 'feedback'"
         )
         click.echo("  python3 candidate_reviewer.py re-evaluate 'job_name'")
+        click.echo("\n   • Quote candidate names with spaces: e.g., 'Jane Doe'")
+        click.echo(
+            "   • Or use underscores: Jane_Doe; or numeric index from show-candidates"
+        )
         click.echo("\n🔧 Utility Commands:")
         click.echo(
             "  python3 candidate_reviewer.py clean-intake              # Clean up processed files"
@@ -1766,16 +1919,35 @@ def help_all(ctx):
 @click.argument("feedback_text", required=False)
 @click.pass_context
 def provide_feedback(
-    ctx, job_name: str, candidate_name: str, feedback_text: str = None
+    ctx,
+    job_name: str,
+    candidate_name: str,
+    feedback_text: str = None,
 ):
     """Provide feedback on a candidate evaluation.
 
-    Can be used interactively or with feedback text:
-    - Interactive: provide-feedback job_name candidate_name
-    - Non-interactive: provide-feedback job_name candidate_name "feedback text"
+    - CANDIDATE_NAME may be: numeric index (from show-candidates), directory id with
+      underscores, or a human-readable name in quotes (supports spaces/accents).
+    - Feedback text is optional; if provided, it pre-fills notes.
+    - Recommendation you select is advisory; it does not override AI scoring.
+
+    Examples:
+      provide-feedback 1 5
+      provide-feedback 1 Jane_Doe
+      provide-feedback 1 "Jane Doe"
+      provide-feedback 1 "Jane Doe" "Prefilled notes here"
     """
     reviewer = ctx.obj["reviewer"]
-    reviewer.provide_feedback(job_name, candidate_name, feedback_text)
+    # Resolve numeric job selection
+    resolved = reviewer._resolve_job_identifier(job_name)
+    if not resolved:
+        sys.exit(1)
+    job_name = resolved
+    reviewer.provide_feedback(
+        job_name,
+        candidate_name,
+        feedback_text=feedback_text,
+    )
 
 
 @cli.command()
@@ -1854,6 +2026,11 @@ def clean_intake(ctx):
 def reset_candidates(ctx, job_name: str):
     """Reset all candidates for a job while keeping job setup and AI insights."""
     reviewer = ctx.obj["reviewer"]
+    resolved = reviewer._resolve_job_identifier(job_name)
+    if not resolved:
+        sys.exit(1)
+    job_name = resolved
+    print(f"📋 Job: {job_name}")
     reviewer.reset_candidates(job_name)
 
 

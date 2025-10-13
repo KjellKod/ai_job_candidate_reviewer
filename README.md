@@ -118,12 +118,15 @@ python3 candidate_reviewer.py open-reports "senior_engineer"
 ### Step 4: Teach the AI (optional but powerful)
 
 ```bash
-# Give feedback on evaluations
-python3 candidate_reviewer.py provide-feedback "senior_engineer" "john_doe" \
+# Give feedback on evaluations (interactive)
+python3 candidate_reviewer.py provide-feedback 1 "John Doe"
+
+# You can prefill notes by pasting as a third argument; you'll still be prompted
+python3 candidate_reviewer.py provide-feedback 1 "John Doe" \
   "Too much weight on years of experience, not enough on practical skills"
 
 # Re-evaluate with improved AI
-python3 candidate_reviewer.py re-evaluate "senior_engineer"
+python3 candidate_reviewer.py re-evaluate 1
 ```
 
 **💡 Pro Tip:** The AI learns from your feedback and applies those insights to future evaluations!
@@ -328,16 +331,17 @@ Options:
 
 ### **Feedback & Learning:**
 ```bash
-python3 candidate_reviewer.py provide-feedback "job_name" "candidate_name" "feedback text"
-python3 candidate_reviewer.py show-insights "job_name"       # View AI learning
-python3 candidate_reviewer.py re-evaluate "job_name"         # Re-evaluate with insights
+python3 candidate_reviewer.py provide-feedback "job_or_number" "candidate_or_number" ["feedback text"]
+python3 candidate_reviewer.py show-insights "job_or_number"     # View AI learning
+python3 candidate_reviewer.py re-evaluate "job_or_number"       # Re-evaluate with insights
 ```
 
-Options:
-- provide-feedback: no options (feedback text optional; if omitted, prompts interactively)
+Candidate resolution:
+- Accepts numeric index (as shown by show-candidates), exact directory name, or human-readable name with spaces/accents.
+- For non-exact matches, the CLI asks for confirmation before applying.
 - show-insights: no options
 - re-evaluate
-  - `-c, --candidates TEXT`       Specify one or more candidates (repeatable)
+  - `-c, --candidates TEXT`   Specify one or more candidates (repeatable)
 
 ### **Reports & Analysis:**
 ```bash

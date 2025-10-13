@@ -216,11 +216,14 @@ class OutputGenerator:
 
         return str(json_path)
 
-    def load_evaluations_for_job(self, job_name: str) -> List[Evaluation]:
+    def load_evaluations_for_job(
+        self, job_name: str, silent: bool = False
+    ) -> List[Evaluation]:
         """Load all evaluations for a job.
 
         Args:
             job_name: Name of the job
+            silent: If True, suppress deduplication messages
 
         Returns:
             List of evaluations (deduplicated by candidate name, keeping most recent)
@@ -247,15 +250,16 @@ class OutputGenerator:
                         )
 
         # Deduplicate by candidate name, keeping the most recent evaluation
-        return self._deduplicate_evaluations(evaluations)
+        return self._deduplicate_evaluations(evaluations, silent=silent)
 
     def _deduplicate_evaluations(
-        self, evaluations: List[Evaluation]
+        self, evaluations: List[Evaluation], silent: bool = False
     ) -> List[Evaluation]:
         """Deduplicate evaluations by candidate name, keeping most recent.
 
         Args:
             evaluations: List of evaluations that may contain duplicates
+            silent: If True, suppress deduplication messages
 
         Returns:
             List of evaluations with duplicates removed
@@ -306,13 +310,15 @@ class OutputGenerator:
 
                 if should_replace:
                     unique_evaluations[existing_index] = evaluation
-                    print(
-                        f"📋 Deduplicated: Replaced {existing_eval.candidate_name} with {evaluation.candidate_name} ({reason})"
-                    )
+                    if not silent:
+                        print(
+                            f"📋 Deduplicated: Replaced {existing_eval.candidate_name} with {evaluation.candidate_name} ({reason})"
+                        )
                 else:
-                    print(
-                        f"📋 Deduplicated: Kept {existing_eval.candidate_name}, skipped {evaluation.candidate_name} ({reason})"
-                    )
+                    if not silent:
+                        print(
+                            f"📋 Deduplicated: Kept {existing_eval.candidate_name}, skipped {evaluation.candidate_name} ({reason})"
+                        )
             else:
                 # No duplicate found, add to unique list
                 unique_evaluations.append(evaluation)
