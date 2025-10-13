@@ -1245,9 +1245,16 @@ class CandidateReviewer:
             typed = input("Press Enter to keep, or type new notes to replace: ").strip()
             feedback_notes = typed if typed else feedback_text
         else:
-            feedback_notes = input("\nPlease explain your reasoning: ").strip()
-            if not feedback_notes:
-                feedback_notes = "No additional notes provided"
+            if human_recommendation in [RecommendationType.NO, RecommendationType.STRONG_NO]:
+                while True:
+                    feedback_notes = input("\n⚠️  Please explain why this is a NO/STRONG_NO (required): ").strip()
+                    if feedback_notes:
+                        break
+                    print("❌ Feedback notes are required for negative recommendations")
+            else:
+                feedback_notes = input("\nPlease explain your reasoning: ").strip()
+                if not feedback_notes:
+                    feedback_notes = "No additional notes provided"
 
         # Do not collect field-level corrections; rely on notes and recommendation
         corrections = {}
@@ -1270,14 +1277,11 @@ class CandidateReviewer:
                     print(
                         "⚠️  Permanent rejection removes candidate from future re-evaluations."
                     )
-                    while True:
-                        rejection_reason = input(
-                            "Please explain why (required): "
-                        ).strip()
-                        if rejection_reason:
-                            should_reject = True
-                            break
-                        print("❌ Rejection reason is required")
+                    rejection_input = input(
+                        f"Rejection reason (press Enter to reuse your feedback notes): "
+                    ).strip()
+                    rejection_reason = rejection_input if rejection_input else feedback_notes
+                    should_reject = True
             except KeyboardInterrupt:
                 print("\n(Skipping permanent rejection)")
 
