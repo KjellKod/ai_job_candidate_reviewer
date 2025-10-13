@@ -28,6 +28,43 @@ LINKEDIN_RE = re.compile(
 )
 GITHUB_RE = re.compile(r"(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9\-]+)", re.I)
 
+# Filename patterns for candidate file detection
+# Patterns are tuples of (regex_pattern, file_type)
+PREFIX_PATTERNS = [
+    (r"^resume_(.+)\.(pdf|txt)$", "resume"),
+    (r"^coverletter_(.+)\.(pdf|txt)$", "coverletter"),
+    (r"^cover_(.+)\.(pdf|txt)$", "coverletter"),
+    (r"^cover_letter_(.+)\.(pdf|txt)$", "coverletter"),
+    (r"^application_(.+)\.(txt|md)$", "application"),
+    (r"^questionnaire_(.+)\.(txt|md)$", "application"),
+]
+
+SUFFIX_PATTERNS = [
+    (r"^(.+)_resume\.(pdf|txt)$", "resume"),
+    (r"^(.+)_coverletter\.(pdf|txt)$", "coverletter"),
+    (r"^(.+)_cover\.(pdf|txt)$", "coverletter"),
+    (r"^(.+)_cover_letter\.(pdf|txt)$", "coverletter"),
+    (r"^(.+)_application\.(txt|md)$", "application"),
+    (r"^(.+)_questionnaire\.(txt|md)$", "application"),
+    # Dot-separated variants (e.g., First_Last.resume.pdf)
+    (r"^(.+)\.resume\.(pdf|txt)$", "resume"),
+    (r"^(.+)\.coverletter\.(pdf|txt)$", "coverletter"),
+    (r"^(.+)\.cover\.(pdf|txt)$", "coverletter"),
+    (r"^(.+)\.cover_letter\.(pdf|txt)$", "coverletter"),
+    (r"^(.+)\.application\.(txt|md)$", "application"),
+    (r"^(.+)\.questionnaire\.(txt|md)$", "application"),
+]
+
+# Expected prefixes for typo detection
+EXPECTED_PREFIXES = [
+    "resume_",
+    "coverletter_",
+    "cover_",
+    "cover_letter_",
+    "application_",
+    "questionnaire_",
+]
+
 
 def _normalize_profile_url(base: str, handle: str) -> str:
     """Normalize profile URL to a canonical form.
@@ -789,50 +826,13 @@ class FileProcessor:
         if not intake_path.exists():
             return candidate_files
 
-        # Patterns for candidate files:
-        #   - Prefix style: {type}_{firstname}_{lastname}.{ext}
-        #   - Suffix style: {firstname}_{lastname}_{type}.{ext}
-        prefix_patterns = [
-            (r"^resume_(.+)\.(pdf|txt)$", "resume"),
-            (r"^coverletter_(.+)\.(pdf|txt)$", "coverletter"),
-            (r"^cover_(.+)\.(pdf|txt)$", "coverletter"),
-            (r"^cover_letter_(.+)\.(pdf|txt)$", "coverletter"),
-            (r"^application_(.+)\.(txt|md)$", "application"),
-            (r"^questionnaire_(.+)\.(txt|md)$", "application"),
-        ]
-        suffix_patterns = [
-            (r"^(.+)_resume\.(pdf|txt)$", "resume"),
-            (r"^(.+)_coverletter\.(pdf|txt)$", "coverletter"),
-            (r"^(.+)_cover\.(pdf|txt)$", "coverletter"),
-            (r"^(.+)_cover_letter\.(pdf|txt)$", "coverletter"),
-            (r"^(.+)_application\.(txt|md)$", "application"),
-            (r"^(.+)_questionnaire\.(txt|md)$", "application"),
-            # Dot-separated variants (e.g., First_Last.resume.pdf)
-            (r"^(.+)\.resume\.(pdf|txt)$", "resume"),
-            (r"^(.+)\.coverletter\.(pdf|txt)$", "coverletter"),
-            (r"^(.+)\.cover\.(pdf|txt)$", "coverletter"),
-            (r"^(.+)\.cover_letter\.(pdf|txt)$", "coverletter"),
-            (r"^(.+)\.application\.(txt|md)$", "application"),
-            (r"^(.+)\.questionnaire\.(txt|md)$", "application"),
-        ]
-
-        # Expected prefixes for typo detection
-        expected_prefixes = [
-            "resume_",
-            "coverletter_",
-            "cover_",
-            "cover_letter_",
-            "application_",
-            "questionnaire_",
-        ]
-
         for file_path in intake_path.iterdir():
             if file_path.is_file():
                 filename = file_path.name
                 matched = False
 
                 # Try exact pattern matching first (prefix)
-                for pattern, file_type in prefix_patterns:
+                for pattern, file_type in PREFIX_PATTERNS:
                     match = re.match(pattern, filename, re.IGNORECASE)
                     if match:
                         candidate_files[str(file_path)] = file_type
@@ -840,7 +840,7 @@ class FileProcessor:
                         break
                 # Try suffix-style patterns
                 if not matched:
-                    for pattern, file_type in suffix_patterns:
+                    for pattern, file_type in SUFFIX_PATTERNS:
                         match = re.match(pattern, filename, re.IGNORECASE)
                         if match:
                             candidate_files[str(file_path)] = file_type
@@ -850,12 +850,12 @@ class FileProcessor:
                 # If no exact match, try typo correction
                 if not matched:
                     corrected_path = self._try_typo_correction(
-                        file_path, expected_prefixes
+                        file_path, EXPECTED_PREFIXES
                     )
                     if corrected_path:
                         # Re-check with corrected filename
                         corrected_filename = Path(corrected_path).name
-                        for pattern, file_type in prefix_patterns + suffix_patterns:
+                        for pattern, file_type in PREFIX_PATTERNS + SUFFIX_PATTERNS:
                             match = re.match(pattern, corrected_filename, re.IGNORECASE)
                             if match:
                                 candidate_files[corrected_path] = file_type
