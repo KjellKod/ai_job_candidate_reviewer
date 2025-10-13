@@ -7,6 +7,7 @@ import pytest
 
 from ai_client import AIClient
 from models import (
+    APIResponse,
     Candidate,
     Evaluation,
     InterviewPriority,
@@ -98,6 +99,45 @@ class TestAIClient:
         assert "Test application" in prompt
         assert "Test insights" in prompt
         assert "JSON format" in prompt
+
+    def test_evaluation_includes_warning_flags_in_openai_prompt(self):
+        """Ensure warning flags from JobContext appear in the OpenAI prompt payload."""
+        client = AIClient("test_key", "gpt-4o")
+
+        job_context = JobContext(
+            name="job",
+            description="desc",
+            ideal_candidate=None,
+            warning_flags="No remote work",
+        )
+
+        candidate = Candidate(name="alice", resume_text="resume text")
+
+        captured = {}
+
+        def fake_make_request(messages):
+            captured["messages"] = messages
+            return APIResponse(
+                success=True,
+                content=json.dumps(
+                    {
+                        "overall_score": 75,
+                        "recommendation": "YES",
+                        "strengths": ["x"],
+                        "concerns": ["y"],
+                        "interview_priority": "MEDIUM",
+                        "detailed_notes": "ok",
+                        "insights_applied": None,
+                    }
+                ),
+            )
+
+        with patch.object(client, "_make_request", side_effect=fake_make_request):
+            client.evaluate_candidate(job_context, candidate)
+
+        user_content = captured["messages"][1]["content"]
+        assert "WARNING FLAGS:" in user_content
+        assert "No remote work" in user_content
 
     def test_evaluation_response_parsing(self):
         """Test parsing of evaluation responses."""
