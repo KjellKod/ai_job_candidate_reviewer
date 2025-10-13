@@ -187,6 +187,8 @@ class AIClient:
             request_params = {
                 "model": self.model,
                 "messages": messages,
+                # this is "stable" setting when you need dynamic output without sacrificing coherence.
+                # https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature
                 "temperature": 0.3,
                 "response_format": {"type": "json_object"},
             }
