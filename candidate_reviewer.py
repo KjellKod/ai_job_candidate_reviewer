@@ -160,6 +160,87 @@ class CandidateReviewer:
         collapsed = re.sub(r"_+", "_", replaced).strip("_")
         return collapsed
 
+    def _mark_candidate_rejected(
+        self, job_name: str, candidate_name: str, reason: str
+    ) -> None:
+        """Mark a candidate as permanently rejected.
+
+        Args:
+            job_name: Name of the job
+            candidate_name: Name of the candidate
+            reason: Reason for rejection (required)
+        """
+        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
+        meta_path = candidate_dir / "candidate_meta.json"
+
+        # Load or create meta file
+        if meta_path.exists():
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        else:
+            meta = {"name": candidate_name}
+
+        # Add rejection info
+        meta["rejected"] = True
+        meta["rejection_reason"] = reason
+        meta["rejection_timestamp"] = datetime.now().isoformat()
+
+        # Save updated meta
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+
+    def _is_candidate_rejected(self, job_name: str, candidate_name: str) -> bool:
+        """Check if a candidate is marked as rejected.
+
+        Args:
+            job_name: Name of the job
+            candidate_name: Name of the candidate
+
+        Returns:
+            True if candidate is rejected, False otherwise
+        """
+        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
+        meta_path = candidate_dir / "candidate_meta.json"
+
+        if not meta_path.exists():
+            return False
+
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                return meta.get("rejected", False)
+        except (json.JSONDecodeError, KeyError):
+            return False
+
+    def _get_rejection_info(self, job_name: str, candidate_name: str) -> Optional[dict]:
+        """Get rejection information for a candidate.
+
+        Args:
+            job_name: Name of the job
+            candidate_name: Name of the candidate
+
+        Returns:
+            Dict with rejection info or None if not rejected
+        """
+        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
+        meta_path = candidate_dir / "candidate_meta.json"
+
+        if not meta_path.exists():
+            return None
+
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                if meta.get("rejected", False):
+                    return {
+                        "reason": meta.get("rejection_reason", "No reason provided"),
+                        "timestamp": meta.get("rejection_timestamp", "Unknown"),
+                    }
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+        return None
+
     def _list_job_candidates(self, job_name: str) -> list[str]:
         from pathlib import Path
 
@@ -1032,6 +1113,47 @@ class CandidateReviewer:
         else:
             print("❌ Could not fetch available models")
 
+    def _get_feedback_context_message(
+        self, job_name: str, insights_just_generated: bool
+    ) -> str:
+        """Generate contextual message after providing feedback.
+
+        Args:
+            job_name: Name of the job
+            insights_just_generated: Whether insights were just generated
+
+        Returns:
+            Formatted message string
+        """
+        if not self.feedback_manager:
+            return ""
+
+        feedback_count = len(self.feedback_manager.get_feedback_history(job_name))
+
+        if feedback_count == 1:
+            # First feedback
+            return (
+                "\n💡 Next Steps:\n"
+                "   → Provide feedback on 1 more candidate to unlock AI insights\n"
+                "   → Then re-evaluate all candidates to apply what the AI learned"
+            )
+        elif insights_just_generated:
+            # Insights were just generated (feedback #2, #4, #6...)
+            return (
+                f"\n💡 **New insights available!** Apply them to all candidates:\n"
+                f"   \n"
+                f"   python3 candidate_reviewer.py re-evaluate {job_name}\n"
+                f"   \n"
+                f"   (Or view insights first: show-insights {job_name})"
+            )
+        else:
+            # Between insight generations (feedback #3, #5, #7...)
+            return (
+                f"\n💡 Next Steps:\n"
+                f"   → Provide feedback on 1 more candidate to update AI insights\n"
+                f"   → Current insights based on {feedback_count} feedback records"
+            )
+
     def provide_feedback(
         self,
         job_name: str,
@@ -1130,6 +1252,35 @@ class CandidateReviewer:
         # Do not collect field-level corrections; rely on notes and recommendation
         corrections = {}
 
+        # Check if candidate should be permanently rejected
+        should_reject = False
+        rejection_reason = None
+
+        if human_recommendation in [
+            RecommendationType.NO,
+            RecommendationType.STRONG_NO,
+        ]:
+            try:
+                reject_input = (
+                    input("\n🚫 Permanently reject this candidate? (y/N): ")
+                    .strip()
+                    .lower()
+                )
+                if reject_input in ("y", "yes"):
+                    print(
+                        "⚠️  Permanent rejection removes candidate from future re-evaluations."
+                    )
+                    while True:
+                        rejection_reason = input(
+                            "Please explain why (required): "
+                        ).strip()
+                        if rejection_reason:
+                            should_reject = True
+                            break
+                        print("❌ Rejection reason is required")
+            except KeyboardInterrupt:
+                print("\n(Skipping permanent rejection)")
+
         # Create feedback object
         from models import HumanFeedback
 
@@ -1143,36 +1294,41 @@ class CandidateReviewer:
 
         # Save feedback
         try:
-            self.feedback_manager.collect_feedback(job_name, candidate_name, feedback)
+            insights_generated = self.feedback_manager.collect_feedback(
+                job_name, candidate_name, feedback
+            )
             print("\n✅ Feedback saved successfully!")
 
+            # Handle permanent rejection if requested
+            if should_reject and rejection_reason:
+                self._mark_candidate_rejected(
+                    job_name, candidate_name, rejection_reason
+                )
+                print(f"\n🚫 {candidate_name} has been permanently rejected")
+                print(f"   Reason: {rejection_reason}")
+                print("   (This candidate will be excluded from future re-evaluations)")
+                # Don't re-evaluate rejected candidates
+                return
+
             # Immediately re-evaluate this candidate to reflect guidance
-            print(
-                "\n🔄 Re-evaluating candidate with your guidance (and insights if available)..."
-            )
+            if insights_generated:
+                print(f"\n🔄 Re-evaluating {candidate_name} with new insights...")
+            else:
+                print(f"\n🔄 Re-evaluating {candidate_name} with your guidance...")
+
             try:
                 # Trigger re-evaluation for only this candidate
                 self.feedback_manager.trigger_re_evaluation(job_name, [candidate_name])
             except Exception as ree:
                 print(f"⚠️  Could not re-evaluate candidate: {ree}")
 
-            # Final guidance message
-            print(
-                "\nℹ️  To update scoring for this and other candidates after changing job criteria:"
+            # Show contextual next steps message
+            context_message = self._get_feedback_context_message(
+                job_name, insights_generated
             )
-            print(
-                "   1) Edit job files in data/jobs/{}/: job_description.*, ideal_candidate.txt, warning_flags.txt".format(
-                    job_name
-                )
-            )
-            print(
-                "   2) (Optional) Generate insights once you have feedback (minimum 2+ candidates):"
-            )
-            print(
-                "      python3 candidate_reviewer.py show-insights {}".format(job_name)
-            )
-            print("   3) Re-evaluate candidates with updated insights:")
-            print("      python3 candidate_reviewer.py re-evaluate {}".format(job_name))
+            if context_message:
+                print(context_message)
+
         except Exception as e:
             print(f"\n❌ Error saving feedback: {e}")
 

@@ -25,13 +25,16 @@ class FeedbackManager:
 
     def collect_feedback(
         self, job_name: str, candidate_name: str, feedback: HumanFeedback
-    ) -> None:
+    ) -> bool:
         """Collect human feedback on an AI evaluation.
 
         Args:
             job_name: Name of the job
             candidate_name: Name of the candidate
             feedback: Human feedback object
+
+        Returns:
+            bool: True if insights were generated as a result of this feedback
         """
         # Load the original evaluation
         candidate_dir = self.config.get_candidate_path(job_name, candidate_name)
@@ -67,7 +70,9 @@ class FeedbackManager:
         print(f"   AI recommendation: {original_evaluation.recommendation.value}")
 
         # Generate new insights if we have enough feedback
-        self._maybe_generate_insights(job_name)
+        insights_generated = self._maybe_generate_insights(job_name)
+
+        return insights_generated
 
     def build_insights(self, job_name: str) -> Optional[JobInsights]:
         """Build job-specific insights from feedback patterns.
@@ -206,6 +211,7 @@ class FeedbackManager:
             return
 
         re_evaluated = []
+        skipped_rejected = []
         total_candidates = len(
             [
                 d
@@ -221,6 +227,13 @@ class FeedbackManager:
 
                 # Skip if specific candidates requested and this isn't one
                 if candidate_names and candidate_name not in candidate_names:
+                    continue
+
+                # Skip rejected candidates (unless explicitly requested by name)
+                if not candidate_names and self._is_candidate_rejected(
+                    job_name, candidate_name
+                ):
+                    skipped_rejected.append(candidate_name)
                     continue
 
                 current_count += 1
@@ -277,6 +290,8 @@ class FeedbackManager:
             print(
                 f"\n🎉 Re-evaluated {len(re_evaluated)} candidates with updated insights"
             )
+            if skipped_rejected:
+                print(f"   ℹ️  Skipped {len(skipped_rejected)} rejected candidates")
 
             # Generate updated reports
             try:
@@ -356,8 +371,12 @@ class FeedbackManager:
         with open(summary_path, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    def _maybe_generate_insights(self, job_name: str) -> None:
-        """Generate insights if we have enough feedback."""
+    def _maybe_generate_insights(self, job_name: str) -> bool:
+        """Generate insights if we have enough feedback.
+
+        Returns:
+            bool: True if insights were generated, False otherwise
+        """
         feedback_count = len(self.get_feedback_history(job_name))
 
         # Generate insights after every 2 feedback records
@@ -366,6 +385,8 @@ class FeedbackManager:
                 f"\n🧠 Generating insights based on {feedback_count} feedback records..."
             )
             self.build_insights(job_name)
+            return True
+        return False
 
     def _load_job_context(self, job_name: str):
         """Load job context from job directory."""
@@ -417,6 +438,29 @@ class FeedbackManager:
                 return JobInsights.from_dict(insights_data)
         except (json.JSONDecodeError, KeyError):
             return None
+
+    def _is_candidate_rejected(self, job_name: str, candidate_name: str) -> bool:
+        """Check if a candidate is marked as rejected.
+
+        Args:
+            job_name: Name of the job
+            candidate_name: Name of the candidate
+
+        Returns:
+            True if candidate is rejected, False otherwise
+        """
+        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
+        meta_path = candidate_dir / "candidate_meta.json"
+
+        if not meta_path.exists():
+            return False
+
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                return meta.get("rejected", False)
+        except (json.JSONDecodeError, KeyError):
+            return False
 
     def _load_candidate_data(self, candidate_dir: Path):
         """Load candidate data from directory."""

@@ -56,9 +56,17 @@ class OutputGenerator:
             flags = []
             if evaluation.candidate_name in duplicate_flags:
                 flags.append("DUPLICATE_IDENTIFIERS")
+
+            # Check rejection status
+            is_rejected = self._is_candidate_rejected(
+                job_name, evaluation.candidate_name
+            )
+            status = "Rejected" if is_rejected else "Active"
+
             csv_data.append(
                 {
                     "Rank": rank,
+                    "Status": status,
                     "Candidate Name": evaluation.candidate_name,
                     "Overall Score": evaluation.overall_score,
                     "Recommendation": evaluation.recommendation.value,
@@ -97,9 +105,22 @@ class OutputGenerator:
             print(f"\n📋 No candidates found for job: {job_name}")
             return
 
+        # Separate rejected and active candidates
+        active_evaluations = []
+        rejected_evaluations = []
+
+        for evaluation in evaluations:
+            if self._is_candidate_rejected(job_name, evaluation.candidate_name):
+                rejected_evaluations.append(evaluation)
+            else:
+                active_evaluations.append(evaluation)
+
         # Sort evaluations by score (descending)
-        sorted_evaluations = sorted(
-            evaluations, key=lambda e: e.overall_score, reverse=True
+        sorted_active = sorted(
+            active_evaluations, key=lambda e: e.overall_score, reverse=True
+        )
+        sorted_rejected = sorted(
+            rejected_evaluations, key=lambda e: e.overall_score, reverse=True
         )
 
         # Load duplicate flags
@@ -124,7 +145,8 @@ class OutputGenerator:
         print("   \033[91mNO\033[0m/\033[95mSTRONG_NO\033[0m = Don't recommend")
         print("=" * 80)
 
-        for rank, evaluation in enumerate(sorted_evaluations, 1):
+        # Display active candidates
+        for rank, evaluation in enumerate(sorted_active, 1):
             # Color coding for recommendations
             rec_color = self._get_recommendation_color(evaluation.recommendation)
             priority_icon = self._get_priority_icon(evaluation.interview_priority)
@@ -157,8 +179,34 @@ class OutputGenerator:
 
         print("\n" + "=" * 80)
 
-        # Summary statistics
-        self._display_summary_stats(sorted_evaluations)
+        # Summary statistics for active candidates
+        self._display_summary_stats(sorted_active)
+
+        # Display rejected candidates section if there are any
+        if sorted_rejected:
+            print("\n" + "─" * 80)
+            print(f"🚫 REJECTED CANDIDATES ({len(sorted_rejected)})")
+            print("─" * 80)
+
+            for evaluation in sorted_rejected:
+                rec_color = self._get_recommendation_color(evaluation.recommendation)
+
+                # Get rejection info
+                rejection_info = self._get_rejection_info(
+                    job_name, evaluation.candidate_name
+                )
+                reason = (
+                    rejection_info.get("reason", "No reason provided")
+                    if rejection_info
+                    else "No reason provided"
+                )
+
+                print(
+                    f"\n    [{evaluation.overall_score}] {rec_color}{evaluation.recommendation.value}\033[0m {evaluation.candidate_name}"
+                )
+                print(f"         Reason: {reason}")
+
+            print("\n" + "=" * 80)
 
     def generate_html_report(
         self, job_context: JobContext, evaluations: List[Evaluation], output_path: str
@@ -617,6 +665,58 @@ class OutputGenerator:
 """
 
         return html
+
+    def _is_candidate_rejected(self, job_name: str, candidate_name: str) -> bool:
+        """Check if a candidate is marked as rejected.
+
+        Args:
+            job_name: Name of the job
+            candidate_name: Name of the candidate
+
+        Returns:
+            True if candidate is rejected, False otherwise
+        """
+        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
+        meta_path = candidate_dir / "candidate_meta.json"
+
+        if not meta_path.exists():
+            return False
+
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                return meta.get("rejected", False)
+        except (json.JSONDecodeError, KeyError):
+            return False
+
+    def _get_rejection_info(self, job_name: str, candidate_name: str) -> Optional[dict]:
+        """Get rejection information for a candidate.
+
+        Args:
+            job_name: Name of the job
+            candidate_name: Name of the candidate
+
+        Returns:
+            Dict with rejection info or None if not rejected
+        """
+        candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
+        meta_path = candidate_dir / "candidate_meta.json"
+
+        if not meta_path.exists():
+            return None
+
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                if meta.get("rejected", False):
+                    return {
+                        "reason": meta.get("rejection_reason", "No reason provided"),
+                        "timestamp": meta.get("rejection_timestamp", "Unknown"),
+                    }
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+        return None
 
     def _load_duplicate_warnings(self, job_name: str) -> Dict[str, str]:
         """Load duplicate warning snippets for all candidates in a job.
