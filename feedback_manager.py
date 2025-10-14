@@ -282,11 +282,34 @@ class FeedbackManager:
                         previous_score = prev_data.get("overall_score")
                 except Exception:
                     previous_score = None
+            # Load screening filters if present
+            screening_filters = None
+            try:
+                filters_path = (
+                    Path(self.config.get_job_path(job_name)) / "screening_filters.json"
+                )
+                if filters_path.exists():
+                    with open(filters_path, "r", encoding="utf-8") as f:
+                        screening_filters = json.load(f)
+            except Exception:
+                screening_filters = None
+
             evaluation = self.ai_client.evaluate_candidate(
                 job_context,
                 candidate,
                 job_insights.generated_insights if job_insights else None,
+                screening_filters,
             )
+
+            # Enforce screening filters via policy layer
+            try:
+                from policy.filter_enforcer import enforce_filters_on_evaluation
+
+                evaluation = enforce_filters_on_evaluation(
+                    evaluation, screening_filters, verbose=False
+                )
+            except Exception:
+                pass
 
             # Save new evaluation (keep history)
             self._save_evaluation_with_history(candidate_dir, evaluation)
