@@ -301,6 +301,16 @@ class FeedbackManager:
                 screening_filters,
             )
 
+            # Enforce screening filters via policy layer
+            try:
+                from policy.filter_enforcer import enforce_filters_on_evaluation
+
+                evaluation = enforce_filters_on_evaluation(
+                    evaluation, screening_filters, verbose=False
+                )
+            except Exception:
+                pass
+
             # Save new evaluation (keep history)
             self._save_evaluation_with_history(candidate_dir, evaluation)
             re_evaluated.append(candidate_name)

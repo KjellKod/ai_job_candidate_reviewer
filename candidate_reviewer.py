@@ -666,6 +666,15 @@ class CandidateReviewer:
             evaluation = self.ai_client.evaluate_candidate(
                 job_context, candidate, job_insights, screening_filters, verbose
             )
+            # Enforce screening filters via policy layer
+            try:
+                from policy.filter_enforcer import enforce_filters_on_evaluation
+
+                evaluation = enforce_filters_on_evaluation(
+                    evaluation, screening_filters, verbose
+                )
+            except Exception:
+                pass
 
             # Save evaluation
             candidate_dir = self.config.get_candidate_path(job_name, candidate.name)
@@ -861,6 +870,19 @@ class CandidateReviewer:
                                 f"(attempt {attempt}/{max_retries-1})..."
                             )
                             time.sleep(wait)
+
+                    # Enforce screening filters via policy layer
+                    if evaluation:
+                        try:
+                            from policy.filter_enforcer import (
+                                enforce_filters_on_evaluation,
+                            )
+
+                            evaluation = enforce_filters_on_evaluation(
+                                evaluation, screening_filters, verbose
+                            )
+                        except Exception:
+                            pass
 
                     # If still failed due to API error, mark as failed and skip saving
                     if evaluation and evaluation.overall_score == 0:

@@ -95,109 +95,20 @@ class AIClient:
             # Parse the JSON response
             evaluation_data = self._parse_evaluation_response(response.content)
 
-            # Deterministic enforcement of screening filters (post-processing)
-            if screening_filters:
-                try:
-                    applied_filters: list[str] = []
-                    # Prefer explicit rules_applied from the model
-                    if isinstance(evaluation_data.get("rules_applied"), list):
-                        applied_filters = [
-                            str(fid) for fid in evaluation_data.get("rules_applied")
-                        ]
-                    else:
-                        # Fallback: parse from detailed_notes prefix "Failed filters: id1, id2"
-                        notes = str(evaluation_data.get("detailed_notes", ""))
-                        marker = "Failed filters:"
-                        if marker in notes:
-                            # take the first line after marker
-                            first_line = notes.split("\n", 1)[0]
-                            ids_part = (
-                                first_line.split(marker, 1)[-1].strip().strip(". ")
-                            )
-                            # split by comma or space
-                            applied_filters = [
-                                p.strip() for p in ids_part.split(",") if p.strip()
-                            ]
-
-                    if applied_filters:
-                        # Build action map from screening_filters
-                        items = (
-                            screening_filters.get("filters", [])
-                            if isinstance(screening_filters, dict)
-                            else []
+            # Ensure failed filters are reflected in notes for downstream policy
+            try:
+                rules_list = evaluation_data.get("rules_applied")
+                notes_text = str(evaluation_data.get("detailed_notes", ""))
+                if isinstance(rules_list, list) and rules_list:
+                    if "Failed filters:" not in notes_text:
+                        prefix = "Failed filters: " + ", ".join(
+                            str(r) for r in rules_list
                         )
-                        id_to_action = {
-                            str(f.get("id")): f.get("action", {}) for f in items
-                        }
+                        evaluation_data["detailed_notes"] = prefix + "\n\n" + notes_text
+            except Exception:
+                pass
 
-                        forced_recommendation = None
-                        cap_recommendation = None
-                        total_deduction = 0
-
-                        for fid in applied_filters:
-                            action = id_to_action.get(fid, {})
-                            if not isinstance(action, dict):
-                                continue
-                            if action.get("set_recommendation"):
-                                forced_recommendation = action.get("set_recommendation")
-                            if action.get("cap_recommendation"):
-                                cap_recommendation = action.get("cap_recommendation")
-                            if action.get("deduct_points") is not None:
-                                try:
-                                    total_deduction += int(action.get("deduct_points"))
-                                except Exception:
-                                    pass
-
-                        # Apply score deduction
-                        if (
-                            isinstance(
-                                evaluation_data.get("overall_score"), (int, float)
-                            )
-                            and total_deduction > 0
-                        ):
-                            new_score = max(
-                                0,
-                                int(evaluation_data.get("overall_score"))
-                                - total_deduction,
-                            )
-                            evaluation_data["overall_score"] = new_score
-
-                        # Apply recommendation overrides/caps
-                        rec = str(evaluation_data.get("recommendation", "NO"))
-                        order = ["STRONG_NO", "NO", "MAYBE", "YES", "STRONG_YES"]
-                        if forced_recommendation:
-                            evaluation_data["recommendation"] = forced_recommendation
-                        elif cap_recommendation and rec in order:
-                            # Cap if current is greater than cap
-                            if cap_recommendation in order and order.index(
-                                rec
-                            ) > order.index(cap_recommendation):
-                                evaluation_data["recommendation"] = cap_recommendation
-
-                        if verbose and (
-                            applied_filters
-                            or total_deduction > 0
-                            or forced_recommendation
-                            or cap_recommendation
-                        ):
-                            print("\n" + "-" * 80)
-                            print("🔧 VERBOSE: Post-processing enforcement applied")
-                            print(
-                                f"   Applied filter IDs: {applied_filters if applied_filters else '[]'}"
-                            )
-                            print(f"   Score deduction: {total_deduction}")
-                            print(f"   Forced recommendation: {forced_recommendation}")
-                            print(f"   Cap recommendation: {cap_recommendation}")
-                            print(
-                                f"   Final score: {evaluation_data.get('overall_score')}"
-                            )
-                            print(
-                                f"   Final recommendation: {evaluation_data.get('recommendation')}"
-                            )
-                            print("-" * 80 + "\n")
-                except Exception:
-                    # Do not fail evaluation on enforcement issues
-                    pass
+            # Deterministic enforcement moved to policy layer (filter_enforcer)
 
             if verbose:
                 print("\n" + "=" * 80)
