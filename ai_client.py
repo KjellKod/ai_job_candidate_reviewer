@@ -36,6 +36,8 @@ class AIClient:
         job_context: JobContext,
         candidate: Candidate,
         job_insights: Optional[str] = None,
+        screening_filters: Optional[Dict] = None,
+        verbose: bool = False,
     ) -> Evaluation:
         """Evaluate a candidate using AI.
 
@@ -47,7 +49,16 @@ class AIClient:
         Returns:
             Evaluation object with AI assessment
         """
-        prompt = self._build_evaluation_prompt(job_context, candidate, job_insights)
+        prompt = self._build_evaluation_prompt(
+            job_context, candidate, job_insights, screening_filters
+        )
+
+        if verbose:
+            print("\n" + "=" * 80)
+            print("🔍 VERBOSE: Full AI Prompt")
+            print("=" * 80)
+            print(prompt)
+            print("=" * 80 + "\n")
 
         try:
             response = self._make_request(
@@ -83,6 +94,19 @@ class AIClient:
 
             # Parse the JSON response
             evaluation_data = self._parse_evaluation_response(response.content)
+
+            if verbose:
+                print("\n" + "=" * 80)
+                print("🔍 VERBOSE: AI Response (Raw JSON)")
+                print("=" * 80)
+                print(response.content)
+                print("=" * 80)
+                print(
+                    f"\nParsed rules_applied: {evaluation_data.get('rules_applied', 'NOT_PROVIDED')}"
+                )
+                print(f"Parsed overall_score: {evaluation_data.get('overall_score')}")
+                print(f"Parsed recommendation: {evaluation_data.get('recommendation')}")
+                print("=" * 80 + "\n")
 
             return Evaluation(
                 candidate_name=candidate.name,
@@ -242,6 +266,7 @@ class AIClient:
         job_context: JobContext,
         candidate: Candidate,
         job_insights: Optional[str] = None,
+        screening_filters: Optional[Dict] = None,
     ) -> str:
         """Build the evaluation prompt for a candidate.
 
@@ -262,6 +287,47 @@ Note: These insights were generated from human feedback on previous
 evaluations for this role.
 """
 
+        filters_section = ""
+        if screening_filters and isinstance(screening_filters, dict):
+            items = screening_filters.get("filters", [])
+            if items:
+                lines = [
+                    "DECISION FILTERS (must enforce):",
+                ]
+                for f in items:
+                    if not f.get("enabled", True):
+                        continue
+                    fid = f.get("id", "unknown")
+                    when = f.get("when", "")
+                    action = f.get("action", {})
+                    actions = []
+                    if action.get("set_recommendation"):
+                        actions.append(
+                            f"set_recommendation={action.get('set_recommendation')}"
+                        )
+                    if action.get("cap_recommendation"):
+                        actions.append(
+                            f"cap_recommendation={action.get('cap_recommendation')}"
+                        )
+                    if action.get("deduct_points") is not None:
+                        actions.append(f"deduct_points={action.get('deduct_points')}")
+                    lines.append(
+                        f"- id: {fid}\n  when: {when}\n  action: {', '.join(actions) if actions else 'none'}"
+                    )
+                lines.append(
+                    "You must apply these filters. If a filter condition is met: (1) apply the specified penalties, (2) set/cap the recommendation as specified, (3) list 'Failed filters: <ids>' at the top of detailed_notes, and (4) include 'rules_applied' in the JSON response."
+                )
+                filters_section = "\n" + "\n".join(lines) + "\n"
+
+        # Global evaluation approach (applies to all jobs)
+        evaluation_approach_section = """
+EVALUATION APPROACH:
+1. Resume is ground truth for experience verification
+2. Application answers are self-reported claims - verify against resume
+3. If application claims X years of experience/responsibility but resume doesn't show it, flag as "unverified claim"
+4. For filters: only count verified evidence from resume, not self-reported application answers
+"""
+
         return f"""You are evaluating job candidates. Analyze the following:
 
 JOB DESCRIPTION:
@@ -273,6 +339,8 @@ IDEAL CANDIDATE PROFILE:
 WARNING FLAGS:
 {job_context.warning_flags or "Not specified"}
 {insights_section}
+{filters_section}
+{evaluation_approach_section}
 CANDIDATE MATERIALS:
 Resume: {candidate.resume_text}
 Cover Letter: {candidate.cover_letter or "Not provided"}
@@ -285,9 +353,10 @@ Provide evaluation in this exact JSON format:
   "strengths": ["strength1", "strength2"],
   "concerns": ["concern1", "concern2"],
   "interview_priority": "HIGH|MEDIUM|LOW",
-  "detailed_notes": "comprehensive evaluation",
+  "detailed_notes": "comprehensive evaluation; include 'Failed filters: ...' if any",
   "insights_applied": "which specific insights influenced this evaluation "
                       "(or null if none)"
+  ,"rules_applied": ["filter_id_1", "filter_id_2"]
 }}"""
 
     def _build_insights_prompt(

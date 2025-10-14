@@ -560,6 +560,7 @@ class CandidateReviewer:
         resume_path: str,
         cover_letter_path: str = None,
         application_path: str = None,
+        verbose: bool = False,
     ) -> ProcessingResult:
         """Process a single candidate using direct file paths.
 
@@ -605,6 +606,30 @@ class CandidateReviewer:
                     errors=["Job context file missing or corrupted"],
                 )
 
+            # Load job insights if available
+            job_insights = None
+            if self.feedback_manager:
+                job_insights_obj = self.feedback_manager._load_job_insights(job_name)
+                if job_insights_obj:
+                    job_insights = job_insights_obj.generated_insights
+
+            # Load screening filters if available
+            screening_filters = self._load_screening_filters(job_name)
+
+            if verbose:
+                print("\n🔍 VERBOSE MODE: Loaded resources")
+                print(f"   Job insights: {'✓ Loaded' if job_insights else '✗ None'}")
+                if screening_filters and screening_filters.get("filters"):
+                    print(
+                        f"   Screening filters: ✓ {len(screening_filters['filters'])} filter(s)"
+                    )
+                    for f in screening_filters["filters"]:
+                        if f.get("enabled", True):
+                            print(f"     - {f.get('id')}: {f.get('title')}")
+                else:
+                    print("   Screening filters: ✗ None")
+                print()
+
             # Validate resume file exists
             if not Path(resume_path).exists():
                 return ProcessingResult(
@@ -638,7 +663,9 @@ class CandidateReviewer:
                 )
 
             # Evaluate candidate with AI
-            evaluation = self.ai_client.evaluate_candidate(job_context, candidate)
+            evaluation = self.ai_client.evaluate_candidate(
+                job_context, candidate, job_insights, screening_filters, verbose
+            )
 
             # Save evaluation
             candidate_dir = self.config.get_candidate_path(job_name, candidate.name)
@@ -679,7 +706,9 @@ class CandidateReviewer:
                 errors=[str(e)],
             )
 
-    def process_candidates(self, job_name: str) -> ProcessingResult:
+    def process_candidates(
+        self, job_name: str, verbose: bool = False
+    ) -> ProcessingResult:
         """Process candidate files for a job.
 
         Args:
@@ -719,6 +748,30 @@ class CandidateReviewer:
                     message="Could not load job context",
                     errors=["Job context file missing or corrupted"],
                 )
+
+            # Load job insights if available
+            job_insights = None
+            if self.feedback_manager:
+                job_insights_obj = self.feedback_manager._load_job_insights(job_name)
+                if job_insights_obj:
+                    job_insights = job_insights_obj.generated_insights
+
+            # Load screening filters if available
+            screening_filters = self._load_screening_filters(job_name)
+
+            if verbose:
+                print("\n🔍 VERBOSE MODE: Loaded resources")
+                print(f"   Job insights: {'✓ Loaded' if job_insights else '✗ None'}")
+                if screening_filters and screening_filters.get("filters"):
+                    print(
+                        f"   Screening filters: ✓ {len(screening_filters['filters'])} filter(s)"
+                    )
+                    for f in screening_filters["filters"]:
+                        if f.get("enabled", True):
+                            print(f"     - {f.get('id')}: {f.get('title')}")
+                else:
+                    print("   Screening filters: ✗ None")
+                print()
 
             # Process candidate files from intake
             candidate_files_list, file_errors = (
@@ -779,7 +832,11 @@ class CandidateReviewer:
                     evaluation = None
                     while attempt < max_retries:
                         evaluation = self.ai_client.evaluate_candidate(
-                            job_context, candidate
+                            job_context,
+                            candidate,
+                            job_insights,
+                            screening_filters,
+                            verbose,
                         )
                         # Detect retryable API error pattern
                         retryable = False
@@ -1113,6 +1170,61 @@ class CandidateReviewer:
         else:
             print("❌ Could not fetch available models")
 
+    # --- Screening filters helpers ---
+    def _get_screening_filters_path(self, job_name: str) -> str:
+        from pathlib import Path
+
+        return str(Path(self.config.get_job_path(job_name)) / "screening_filters.json")
+
+    def _load_screening_filters(self, job_name: str) -> Optional[dict]:
+        from pathlib import Path
+
+        filters_path = Path(self._get_screening_filters_path(job_name))
+        if not filters_path.exists():
+            return None
+        try:
+            with open(filters_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def _append_screening_filter(self, job_name: str, filter_item: dict) -> None:
+        from pathlib import Path
+
+        filters_path = Path(self._get_screening_filters_path(job_name))
+        filters_doc = {
+            "version": 1,
+            "updated_at": datetime.now().isoformat(),
+            "filters": [],
+        }
+        if filters_path.exists():
+            try:
+                with open(filters_path, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+                    if isinstance(existing, dict):
+                        filters_doc.update(
+                            {k: v for k, v in existing.items() if k != "filters"}
+                        )
+                        filters_doc["filters"] = existing.get("filters", [])
+            except (json.JSONDecodeError, OSError):
+                pass
+        filters_doc["filters"].append(filter_item)
+        filters_doc["updated_at"] = datetime.now().isoformat()
+        filters_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(filters_path, "w", encoding="utf-8") as f:
+            json.dump(filters_doc, f, indent=2, ensure_ascii=False)
+
+    def _slugify(self, text: str) -> str:
+        import re as _re
+        import unicodedata as _ud
+
+        norm = _ud.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+        norm = norm.lower()
+        norm = _re.sub(r"[^a-z0-9]+", "-", norm).strip("-")
+        if not norm:
+            norm = f"filter-{int(datetime.now().timestamp())}"
+        return norm[:60]
+
     def _get_feedback_context_message(
         self, job_name: str, insights_just_generated: bool
     ) -> str:
@@ -1318,6 +1430,82 @@ class CandidateReviewer:
                 print(f"\n🚫 {candidate_name} has been permanently rejected")
                 print(f"   Reason: {rejection_reason}")
                 print("   (This candidate will be excluded from future re-evaluations)")
+                # Offer to create a reusable screening filter
+                try:
+                    add_filter = (
+                        input(
+                            "\n🧰 Create a reusable screening filter to catch similar cases? (y/N): "
+                        )
+                        .strip()
+                        .lower()
+                    )
+                    if add_filter in ("y", "yes"):
+                        # Use feedback notes as the starting point
+                        print("\n📝 Define the screening filter (all fields required):")
+                        print(f"   Based on your feedback: {rejection_reason[:80]}...")
+
+                        # Title (required)
+                        title = None
+                        while not title:
+                            title = input(
+                                "\nFilter title (short description): "
+                            ).strip()
+                            if not title:
+                                print("❌ Title is required")
+
+                        # When clause (prefilled with rejection reason, but editable and required)
+                        print(f"\nWhen this condition is met (edit as needed):")
+                        print(f"Prefilled: {rejection_reason}")
+                        when_clause = None
+                        while not when_clause:
+                            user_input = input(
+                                "Press Enter to use prefilled text, or type new condition: "
+                            ).strip()
+                            when_clause = user_input if user_input else rejection_reason
+                            if not when_clause:
+                                print("❌ Condition is required")
+
+                        # Action choices (required)
+                        print("\nAction to take when condition is met:")
+                        print("  1) set_recommendation=NO (hard rejection)")
+                        print("  2) cap_recommendation=MAYBE (allow at most MAYBE)")
+                        choice = None
+                        while choice not in ("1", "2"):
+                            choice = input("Choose action (1 or 2): ").strip()
+                            if choice not in ("1", "2"):
+                                print("❌ Please choose 1 or 2")
+
+                        if choice == "2":
+                            action = {"cap_recommendation": "MAYBE"}
+                        else:
+                            action = {"set_recommendation": "NO"}
+
+                        # Points deduction (required)
+                        deduct_points = None
+                        while deduct_points is None:
+                            deduct_input = input(
+                                "Points to deduct (e.g., 30, or 0 for none): "
+                            ).strip()
+                            if deduct_input.isdigit():
+                                deduct_points = int(deduct_input)
+                                if deduct_points > 0:
+                                    action["deduct_points"] = deduct_points
+                            else:
+                                print("❌ Please enter a number")
+                        # Build filter item
+                        filter_item = {
+                            "id": self._slugify(title),
+                            "title": title,
+                            "when": when_clause,
+                            "action": action,
+                            "enabled": True,
+                            "source": "human",
+                            "rationale": rejection_reason,
+                        }
+                        self._append_screening_filter(job_name, filter_item)
+                        print("✅ Screening filter saved for this job")
+                except KeyboardInterrupt:
+                    print("\n(Skipped creating screening filter)")
                 # Always regenerate reports after feedback (even without re-evaluation)
                 try:
                     from output_generator import OutputGenerator
@@ -1427,8 +1615,68 @@ class CandidateReviewer:
                 for key, value in insights_json.items():
                     print(f"\n• {key.replace('_', ' ').title()}:")
                     _print_value(value, 2)
+                # After insights, show screening filters
+                filters = self._load_screening_filters(job_name)
+                print("\n🧰 Screening Filters")
+                print("=" * 60)
+                if not filters or not filters.get("filters"):
+                    print("No screening filters defined for this job.")
+                else:
+                    items = filters.get("filters", [])
+                    print(f"Total: {len(items)}")
+                    for f in items:
+                        status = "ENABLED" if f.get("enabled", True) else "DISABLED"
+                        print(f"\n• {f.get('id','unknown')} [{status}]")
+                        print(f"  Title: {f.get('title','Untitled')}")
+                        print(f"  When: {f.get('when','N/A')}")
+                        action = f.get("action", {})
+                        if action:
+                            parts = []
+                            if action.get("set_recommendation"):
+                                parts.append(
+                                    f"set_recommendation={action['set_recommendation']}"
+                                )
+                            if action.get("cap_recommendation"):
+                                parts.append(
+                                    f"cap_recommendation={action['cap_recommendation']}"
+                                )
+                            if action.get("deduct_points") is not None:
+                                parts.append(f"deduct_points={action['deduct_points']}")
+                            print(f"  Action: {', '.join(parts) if parts else 'N/A'}")
+                        src = f.get("source", "unknown")
+                        print(f"  Source: {src}")
             except json.JSONDecodeError:
                 _print_value(insights.generated_insights, 2)
+                # After insights (non-JSON), still show filters
+                filters = self._load_screening_filters(job_name)
+                print("\n🧰 Screening Filters")
+                print("=" * 60)
+                if not filters or not filters.get("filters"):
+                    print("No screening filters defined for this job.")
+                else:
+                    items = filters.get("filters", [])
+                    print(f"Total: {len(items)}")
+                    for f in items:
+                        status = "ENABLED" if f.get("enabled", True) else "DISABLED"
+                        print(f"\n• {f.get('id','unknown')} [{status}]")
+                        print(f"  Title: {f.get('title','Untitled')}")
+                        print(f"  When: {f.get('when','N/A')}")
+                        action = f.get("action", {})
+                        if action:
+                            parts = []
+                            if action.get("set_recommendation"):
+                                parts.append(
+                                    f"set_recommendation={action['set_recommendation']}"
+                                )
+                            if action.get("cap_recommendation"):
+                                parts.append(
+                                    f"cap_recommendation={action['cap_recommendation']}"
+                                )
+                            if action.get("deduct_points") is not None:
+                                parts.append(f"deduct_points={action['deduct_points']}")
+                            print(f"  Action: {', '.join(parts) if parts else 'N/A'}")
+                        src = f.get("source", "unknown")
+                        print(f"  Source: {src}")
 
         except Exception as e:
             print(f"❌ Error loading insights: {e}")
@@ -1969,6 +2217,9 @@ def setup_job(
 @click.option(
     "--candidate-name", "-n", help="Candidate name (if not using intake naming)"
 )
+@click.option(
+    "--verbose", "-v", is_flag=True, help="Show detailed AI prompt and response"
+)
 @click.pass_context
 def process_candidates(
     ctx,
@@ -1977,6 +2228,7 @@ def process_candidates(
     cover_letter: str = None,
     application: str = None,
     candidate_name: str = None,
+    verbose: bool = False,
 ):
     """Process candidate files for evaluation.
 
@@ -2005,11 +2257,11 @@ def process_candidates(
             sys.exit(1)
 
         result = reviewer.process_single_candidate(
-            job_name, candidate_name, resume, cover_letter, application
+            job_name, candidate_name, resume, cover_letter, application, verbose
         )
     else:
         # Use intake directory
-        result = reviewer.process_candidates(job_name)
+        result = reviewer.process_candidates(job_name, verbose)
 
     if result.success:
         click.echo(f"✅ {result.message}")
