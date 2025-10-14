@@ -29,7 +29,9 @@ Drop Files → AI Analysis → Ranked Results → Your Feedback → Improved Ran
 - **Structured evaluations** with scores (0-100) and recommendations
 - **Interview priorities** (HIGH/MEDIUM/LOW) to focus your time
 - **Smart duplicate detection** - Automatically identifies duplicate/fake candidates by email, phone, LinkedIn, and GitHub
+- **Screening filters** - Define hard rules that AI must enforce (auto-reject unqualified candidates)
 - **AI learning** from your feedback improves future screenings
+- **Evaluation history** - Track how candidate scores change over time with re-evaluations
 - **Multiple formats** - CSV reports and HTML summaries
 - **Privacy-first** - All data stays local, only candidate content goes to OpenAI
 - **Fast** - Process multiple candidates in seconds
@@ -69,7 +71,9 @@ python3 candidate_reviewer.py test-connection
 
 **Going Further:**
 - [Advanced Features](#advanced-improve-results) - Fine-tune AI behavior
+- [Screening Filters](#screening-filters) - Automated policy enforcement for hard requirements
 - [Smart Duplicate Detection](#smart-duplicate-detection) - Automatic duplicate/fake candidate detection
+- [AI Learning & Re-evaluation](#ai-learning--re-evaluation) - How the system improves over time
 - [Troubleshooting](#troubleshooting) - Common issues
 - [Additional Resources](#additional-resources) - Detailed guides
 
@@ -125,11 +129,18 @@ python3 candidate_reviewer.py provide-feedback 1 "John Doe"
 python3 candidate_reviewer.py provide-feedback 1 "John Doe" \
   "Too much weight on years of experience, not enough on practical skills"
 
-# Re-evaluate with improved AI
+# When rejecting candidates, you can create screening filters (hard rules)
+# that automatically reject similar candidates in the future
+
+# Re-evaluate with improved AI (shows score deltas)
 python3 candidate_reviewer.py re-evaluate 1
+# Output: ✅ Re-evaluated John Doe (was 60 → now 75 | Δ +15)
 ```
 
-**💡 Pro Tip:** The AI learns from your feedback and applies those insights to future evaluations!
+**💡 Pro Tips:** 
+- The AI learns from your feedback and applies those insights to future evaluations
+- Create screening filters to automatically enforce hard requirements (e.g., "must have 5+ years Python")
+- Re-evaluations show score changes and skip rejected candidates by default
 
 ---
 
@@ -342,6 +353,8 @@ Candidate resolution:
 - show-insights: no options
 - re-evaluate
   - `-c, --candidates TEXT`   Specify one or more candidates (repeatable)
+  - By default, skips rejected candidates (use `-c` to re-evaluate specific rejected candidates)
+  - Shows score deltas (e.g., "was 60 → now 75 | Δ +15")
 
 ### **Reports & Analysis:**
 ```bash
@@ -450,6 +463,193 @@ This way the AI can evaluate both the resume/cover letter AND the questionnaire 
 
 ---
 
+## Screening Filters
+
+**Automated Policy Enforcement for Hard Requirements**
+
+Screening filters allow you to define rules that the AI **must** enforce, ensuring consistent rejection or downgrading of unqualified candidates.
+
+### Quick Example
+
+When you reject a candidate during feedback, you can create a filter:
+
+```bash
+python3 candidate_reviewer.py provide-feedback "job_name" "candidate_name"
+# Mark as NO or STRONG_NO
+# System prompts: "Create a screening filter from this rejection? (y/n)"
+```
+
+You'll define:
+- **Title**: "Require ≥3 years people management"
+- **Condition**: "When candidate has less than 3 years verified people management experience"
+- **Action**: `set_recommendation=NO` or `cap_recommendation=MAYBE`
+
+### What Filters Can Do
+
+| Action | Effect | Use Case |
+|--------|--------|----------|
+| `set_recommendation=NO` | Force rejection | Deal-breakers (e.g., missing required certification) |
+| `cap_recommendation=MAYBE` | Limit to at most MAYBE | Concerns but not disqualifying |
+| `deduct_points=20` | Subtract from score | Penalize without auto-rejection |
+
+### Common Filter Examples
+
+**Minimum experience requirement:**
+```json
+{
+  "id": "require-5-years-python",
+  "title": "Require 5+ years Python experience",
+  "when": "When candidate has less than 5 years of Python development experience",
+  "action": {
+    "set_recommendation": "NO",
+    "deduct_points": 40
+  },
+  "enabled": true
+}
+```
+
+**Red flag for job hopping:**
+```json
+{
+  "id": "flag-job-hopping",
+  "title": "Flag excessive job hopping",
+  "when": "When candidate has 4+ jobs in the last 2 years",
+  "action": {
+    "cap_recommendation": "MAYBE",
+    "deduct_points": 15
+  },
+  "enabled": true
+}
+```
+
+### How It Works
+
+1. **AI evaluates** candidate against filter conditions
+2. **AI marks** failed filters in evaluation notes
+3. **Policy layer** deterministically enforces penalties (double-checks AI work)
+4. **Reports show** which filters were triggered and why
+
+### Managing Filters
+
+View filters for a job:
+```bash
+cat data/jobs/{job_name}/screening_filters.json
+```
+
+Disable without deleting (edit file):
+```json
+{
+  "id": "some-filter",
+  "enabled": false,  // ← Temporarily disable
+  ...
+}
+```
+
+Re-evaluate after changing filters:
+```bash
+python3 candidate_reviewer.py re-evaluate "job_name"
+```
+
+**📖 See `SCREENING_FILTERS.md` for complete guide including examples, best practices, and troubleshooting.**
+
+---
+
+## AI Learning & Re-evaluation
+
+### How the System Learns
+
+The system improves through a feedback loop:
+
+1. **Provide Feedback** → Tell the AI what it got wrong
+2. **Generate Insights** → After every 2 feedback records, AI analyzes patterns
+3. **Re-evaluate** → Apply insights to improve all candidate evaluations
+
+### Feedback Collection
+
+```bash
+python3 candidate_reviewer.py provide-feedback "job_name" "candidate_name"
+```
+
+You'll be prompted to:
+- Rate the candidate yourself (STRONG_YES to STRONG_NO)
+- Give your score (0-100)
+- Explain what the AI got wrong or missed
+- Optionally create a screening filter (if rejecting)
+
+### Insights Generation
+
+After every 2 feedback records, the system:
+- Analyzes patterns in your feedback
+- Identifies what the AI is over/under-weighting
+- Generates insights stored in `data/jobs/{job_name}/insights.json`
+
+View insights:
+```bash
+python3 candidate_reviewer.py show-insights "job_name"
+```
+
+### Re-evaluation Process
+
+```bash
+# Re-evaluate all candidates (skips rejected by default)
+python3 candidate_reviewer.py re-evaluate "job_name"
+
+# Re-evaluate specific candidates (including rejected ones)
+python3 candidate_reviewer.py re-evaluate "job_name" -c "John Doe" -c "Jane Smith"
+```
+
+**What happens during re-evaluation:**
+- Loads updated insights and screening filters
+- Re-evaluates candidates with improved AI understanding
+- Shows score changes: `✅ Re-evaluated John Doe (was 60 → now 75 | Δ +15)`
+- Maintains history in `evaluation_history.json` per candidate
+- Regenerates CSV and HTML reports
+
+**Smart defaults:**
+- Processes highest-scoring candidates first (to focus on top talent)
+- Skips rejected candidates unless explicitly specified
+- Cleans up stale duplicate warnings
+- Shows progress with counters (e.g., "2/10")
+
+### Evaluation History
+
+Every re-evaluation preserves the previous evaluation in `data/candidates/{job_name}/{candidate_name}/evaluation_history.json`.
+
+This lets you:
+- Track how scores changed over time
+- See how insights improved evaluations
+- Audit AI decision-making
+- Rollback if needed (manually)
+
+**Example history:**
+```json
+[
+  {
+    "overall_score": 65,
+    "recommendation": "MAYBE",
+    "timestamp": "2024-10-13T14:30:00"
+  },
+  {
+    "overall_score": 78,
+    "recommendation": "YES",
+    "timestamp": "2024-10-13T16:45:00"
+  }
+]
+```
+
+### Filters vs Insights
+
+| Feature | Type | Use Case |
+|---------|------|----------|
+| **Screening Filters** | Hard rules | Deal-breakers, minimum requirements, compliance |
+| **Insights** | Soft guidance | Preferences, nuanced evaluation criteria |
+
+Both work together:
+- **Filters** automatically reject/downgrade unqualified candidates
+- **Insights** help AI better evaluate qualified candidates
+
+---
+
 ## Smart Duplicate Detection
 
 The system automatically detects and handles duplicate candidates using identity-based matching. This protects you from:
@@ -525,6 +725,7 @@ Identifiers are extracted from resume/cover letter/application text you provide 
 ### For Users
 
 - **[Getting Started Guide](GETTING_STARTED.md)** - Detailed step-by-step setup and usage tutorials
+- **[Screening Filters Guide](SCREENING_FILTERS.md)** - Complete guide to automated policy enforcement
 - **[Configuration Guide](CONFIGURATION.md)** - Complete reference for all environment variables and settings
 - **[GitHub Issues](../../issues)** - Report bugs or request features
 

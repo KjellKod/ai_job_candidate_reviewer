@@ -90,14 +90,76 @@ data/
 - Automatic file organization
 - Score-based candidate ranking
 
-## Next Steps (Phase 2)
+✅ **Advanced Features (Fully Implemented)**
 
-The foundation is solid! Next we'll implement:
+1. **Feedback System** (`feedback_manager.py`) ✅
+   - Human feedback collection via `provide-feedback` command
+   - Interactive prompts for rating and comments
+   - Feedback history tracking per candidate
 
-1. **Feedback System** (`feedback_manager.py`)
-2. **Human Feedback Collection** (`--provide-feedback`)
-3. **AI Learning & Insights** (`--show-insights`, `--re-evaluate`)
-4. **Enhanced Prompts** with dynamic insight integration
+2. **AI Learning & Insights** ✅
+   - Automatic insights generation after every 2 feedback records
+   - `show-insights` command to view AI learning
+   - `re-evaluate` command to apply insights to all candidates
+   - Evaluation history tracking in `evaluation_history.json`
+   - Score delta display (e.g., "was 60 → now 75 | Δ +15")
+
+3. **Screening Filters** (`policy/filter_enforcer.py`) ✅
+   - Define hard rules that AI must enforce
+   - Interactive filter creation during feedback
+   - Deterministic policy enforcement (two-layer architecture)
+   - Filter management via `screening_filters.json`
+   - Actions: `set_recommendation`, `cap_recommendation`, `deduct_points`
+
+4. **Smart Duplicate Detection** ✅
+   - Identity-based matching (email, phone, LinkedIn, GitHub)
+   - Automatic duplicate/fake candidate detection
+   - Name collision handling
+   - Duplicate warnings in reports
+
+5. **Re-evaluation System** ✅
+   - Smart re-evaluation with score deltas
+   - Skip rejected candidates by default
+   - Process highest-scoring candidates first
+   - Clean up stale duplicate warnings
+   - Apply both insights and filters
+
+## Quick Feature Tour
+
+### Provide Feedback
+```bash
+python3 candidate_reviewer.py provide-feedback "job_name" "candidate_name"
+```
+- Rate candidate (STRONG_YES to STRONG_NO)
+- Provide score (0-100)
+- Explain what AI got wrong
+- Optionally create screening filter (if rejecting)
+
+### View AI Learning
+```bash
+python3 candidate_reviewer.py show-insights "job_name"
+```
+Shows patterns the AI learned from your feedback.
+
+### Re-evaluate with Insights
+```bash
+python3 candidate_reviewer.py re-evaluate "job_name"
+```
+Applies insights and updated filters to all candidates, showing score changes.
+
+### Create Screening Filters
+During feedback, when rejecting a candidate:
+```
+📝 Would you like to create a screening filter from this rejection? (y/n): y
+```
+Define rules like "Require 5+ years Python experience" that automatically reject similar candidates.
+
+## Advanced Usage
+
+See these guides for detailed information:
+- **[Screening Filters Guide](SCREENING_FILTERS.md)** - Complete guide to automated policy enforcement
+- **[README.md](README.md)** - Full user documentation with all features
+- **[Architecture Guide](ARCHITECTURE.md)** - Technical architecture and design decisions
 
 ## Testing the System
 
