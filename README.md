@@ -337,6 +337,7 @@ Options:
   - `-c, --cover-letter PATH`     Optional cover letter path
   - `-a, --application PATH`      Optional application/questionnaire path
   - `-n, --candidate-name TEXT`   Candidate name (required with -r)
+  - `-v, --verbose`               Show detailed AI prompt and response
 
 - show-candidates: no options
 
