@@ -70,8 +70,17 @@ def enforce_filters_on_evaluation(
     total_deduction = 0
 
     for fid in applied_filters:
-        action = id_to_action.get(fid, {})
+        action = id_to_action.get(fid)
+        if action is None:
+            if verbose:
+                print(
+                    f"   ⚠️  Filter '{fid}' was applied by AI but not found in "
+                    f"screening_filters.json"
+                )
+            continue
         if not isinstance(action, dict):
+            if verbose:
+                print(f"   ⚠️  Filter '{fid}' has invalid action (not a dict)")
             continue
         if action.get("set_recommendation"):
             forced_recommendation = action.get("set_recommendation")
@@ -79,15 +88,25 @@ def enforce_filters_on_evaluation(
             cap_recommendation = action.get("cap_recommendation")
         if action.get("deduct_points") is not None:
             try:
-                total_deduction += int(action.get("deduct_points"))
-            except Exception:
-                pass
+                points = int(action.get("deduct_points"))
+                total_deduction += points
+            except (ValueError, TypeError) as e:
+                if verbose:
+                    print(
+                        f"   ⚠️  Filter '{fid}' has invalid deduct_points: "
+                        f"{action.get('deduct_points')} ({e})"
+                    )
 
     # Apply score deduction
     if total_deduction > 0:
-        evaluation.overall_score = max(
-            0, int(evaluation.overall_score) - total_deduction
-        )
+        try:
+            original_score = int(evaluation.overall_score)
+            evaluation.overall_score = max(0, original_score - total_deduction)
+        except (ValueError, TypeError) as e:
+            print(
+                f"⚠️  Could not apply score deduction: "
+                f"evaluation.overall_score is invalid ({evaluation.overall_score}): {e}"
+            )
 
     # Apply recommendation overrides/caps
     rec_order = [
@@ -98,16 +117,22 @@ def enforce_filters_on_evaluation(
         RecommendationType.STRONG_YES.value,
     ]
 
-    current_rec = evaluation.recommendation.value
-    if forced_recommendation and forced_recommendation in rec_order:
-        evaluation.recommendation = RecommendationType(forced_recommendation)
-    elif (
-        cap_recommendation
-        and current_rec in rec_order
-        and cap_recommendation in rec_order
-    ):
-        if rec_order.index(current_rec) > rec_order.index(cap_recommendation):
-            evaluation.recommendation = RecommendationType(cap_recommendation)
+    try:
+        current_rec = evaluation.recommendation.value
+        if forced_recommendation and forced_recommendation in rec_order:
+            evaluation.recommendation = RecommendationType(forced_recommendation)
+        elif (
+            cap_recommendation
+            and current_rec in rec_order
+            and cap_recommendation in rec_order
+        ):
+            if rec_order.index(current_rec) > rec_order.index(cap_recommendation):
+                evaluation.recommendation = RecommendationType(cap_recommendation)
+    except (ValueError, AttributeError) as e:
+        print(
+            f"⚠️  Could not apply recommendation override: "
+            f"Invalid recommendation value ({e})"
+        )
 
     if verbose:
         print("\n" + "-" * 80)
