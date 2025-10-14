@@ -101,7 +101,9 @@ class AIClient:
                     applied_filters: list[str] = []
                     # Prefer explicit rules_applied from the model
                     if isinstance(evaluation_data.get("rules_applied"), list):
-                        applied_filters = [str(fid) for fid in evaluation_data.get("rules_applied")]
+                        applied_filters = [
+                            str(fid) for fid in evaluation_data.get("rules_applied")
+                        ]
                     else:
                         # Fallback: parse from detailed_notes prefix "Failed filters: id1, id2"
                         notes = str(evaluation_data.get("detailed_notes", ""))
@@ -109,14 +111,24 @@ class AIClient:
                         if marker in notes:
                             # take the first line after marker
                             first_line = notes.split("\n", 1)[0]
-                            ids_part = first_line.split(marker, 1)[-1].strip().strip(". ")
+                            ids_part = (
+                                first_line.split(marker, 1)[-1].strip().strip(". ")
+                            )
                             # split by comma or space
-                            applied_filters = [p.strip() for p in ids_part.split(",") if p.strip()]
+                            applied_filters = [
+                                p.strip() for p in ids_part.split(",") if p.strip()
+                            ]
 
                     if applied_filters:
                         # Build action map from screening_filters
-                        items = screening_filters.get("filters", []) if isinstance(screening_filters, dict) else []
-                        id_to_action = {str(f.get("id")): f.get("action", {}) for f in items}
+                        items = (
+                            screening_filters.get("filters", [])
+                            if isinstance(screening_filters, dict)
+                            else []
+                        )
+                        id_to_action = {
+                            str(f.get("id")): f.get("action", {}) for f in items
+                        }
 
                         forced_recommendation = None
                         cap_recommendation = None
@@ -137,8 +149,17 @@ class AIClient:
                                     pass
 
                         # Apply score deduction
-                        if isinstance(evaluation_data.get("overall_score"), (int, float)) and total_deduction > 0:
-                            new_score = max(0, int(evaluation_data.get("overall_score")) - total_deduction)
+                        if (
+                            isinstance(
+                                evaluation_data.get("overall_score"), (int, float)
+                            )
+                            and total_deduction > 0
+                        ):
+                            new_score = max(
+                                0,
+                                int(evaluation_data.get("overall_score"))
+                                - total_deduction,
+                            )
                             evaluation_data["overall_score"] = new_score
 
                         # Apply recommendation overrides/caps
@@ -148,19 +169,32 @@ class AIClient:
                             evaluation_data["recommendation"] = forced_recommendation
                         elif cap_recommendation and rec in order:
                             # Cap if current is greater than cap
-                            if cap_recommendation in order and order.index(rec) > order.index(cap_recommendation):
+                            if cap_recommendation in order and order.index(
+                                rec
+                            ) > order.index(cap_recommendation):
                                 evaluation_data["recommendation"] = cap_recommendation
 
-                        if verbose and (applied_filters or total_deduction > 0 or forced_recommendation or cap_recommendation):
-                            print("\n" + "-"*80)
+                        if verbose and (
+                            applied_filters
+                            or total_deduction > 0
+                            or forced_recommendation
+                            or cap_recommendation
+                        ):
+                            print("\n" + "-" * 80)
                             print("🔧 VERBOSE: Post-processing enforcement applied")
-                            print(f"   Applied filter IDs: {applied_filters if applied_filters else '[]'}")
+                            print(
+                                f"   Applied filter IDs: {applied_filters if applied_filters else '[]'}"
+                            )
                             print(f"   Score deduction: {total_deduction}")
                             print(f"   Forced recommendation: {forced_recommendation}")
                             print(f"   Cap recommendation: {cap_recommendation}")
-                            print(f"   Final score: {evaluation_data.get('overall_score')}")
-                            print(f"   Final recommendation: {evaluation_data.get('recommendation')}")
-                            print("-"*80 + "\n")
+                            print(
+                                f"   Final score: {evaluation_data.get('overall_score')}"
+                            )
+                            print(
+                                f"   Final recommendation: {evaluation_data.get('recommendation')}"
+                            )
+                            print("-" * 80 + "\n")
                 except Exception:
                     # Do not fail evaluation on enforcement issues
                     pass
