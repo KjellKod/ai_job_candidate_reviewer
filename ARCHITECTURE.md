@@ -9,6 +9,8 @@
 | `candidate_reviewer.py` | Main CLI interface and orchestration | ✅ (Main entry point) |
 | `open_api_test_connection.py` | **ONLY** OpenAI connection testing & model selection | ✅ (Standalone tester) |
 | `ai_client.py` | AI evaluation and insights generation | ❌ (Library component) |
+| `policy/filter_enforcer.py` | Deterministic screening filter enforcement | ❌ (Library component) |
+| `feedback_manager.py` | Feedback collection, insights generation, re-evaluation | ❌ (Library component) |
 | `config.py` | Configuration and environment management | ❌ (Library component) |
 | `models.py` | Type-safe data structures | ❌ (Library component) |
 | `file_processor.py` | File handling, PDF extraction, organization | ❌ (Library component) |
@@ -80,6 +82,8 @@ python3 candidate_reviewer.py show-candidates "job_name"
 
 ## Data Flow
 
+### Basic Evaluation Flow
+
 ```
 User Input → Config → Connection Tester → AI Client → File Processor → Output Generator
 ```
@@ -89,6 +93,30 @@ User Input → Config → Connection Tester → AI Client → File Processor →
 3. **AI Client** uses selected model for evaluations
 4. **File Processor** handles PDF extraction and organization
 5. **Output Generator** creates CSV, HTML, and terminal displays
+
+### Evaluation with Screening Filters
+
+```
+Job Setup → Screening Filters Defined → AI Evaluation → Policy Enforcement → Output
+```
+
+1. **Screening filters** loaded from `screening_filters.json`
+2. **AI Client** evaluates candidate and checks filter conditions
+3. **AI** marks failed filters in `detailed_notes` field
+4. **Policy Enforcer** deterministically applies penalties (double-checks AI)
+5. **Output** shows which filters were triggered
+
+### Feedback and Learning Loop
+
+```
+Feedback → Insights Generation → Re-evaluation → Updated Reports
+```
+
+1. **Feedback Manager** collects human feedback on evaluations
+2. **Insights generated** after every 2 feedback records
+3. **Re-evaluation** applies insights and updated filters
+4. **Evaluation history** preserved in `evaluation_history.json`
+5. **Reports regenerated** with updated scores
 
 ## Identity-Based Duplicate Detection
 
@@ -141,3 +169,130 @@ All identifier extraction happens locally. Identifiers are:
   - Adds a red banner in HTML per affected candidate with the warning summary
 
 This architecture ensures clean separation of concerns while maintaining ease of use and debugging capabilities.
+
+## Screening Filters Architecture
+
+### Two-Layer Enforcement System
+
+The system uses a hybrid approach to ensure reliable filter enforcement:
+
+**Layer 1: AI Evaluation** (`ai_client.py`)
+- Reads `screening_filters.json` during evaluation
+- Includes filter conditions in evaluation prompt
+- AI evaluates candidate against filters
+- If filter matches, AI:
+  - Writes "Failed filters: filter-id-1, filter-id-2" at top of `detailed_notes`
+  - Applies penalties (score deductions, recommendation caps)
+  - Includes reasoning in evaluation
+
+**Layer 2: Policy Enforcement** (`policy/filter_enforcer.py`)
+- Runs after AI evaluation completes
+- Parses "Failed filters: ..." from `detailed_notes`
+- Deterministically applies penalties
+- Ensures AI didn't make calculation errors
+- Validates recommendation caps/sets
+
+### Why Two Layers?
+
+**Problem:** AI models can be inconsistent. An AI might:
+- Forget to apply a penalty
+- Calculate deductions incorrectly  
+- Set wrong recommendation value
+
+**Solution:** Policy layer provides deterministic enforcement:
+- Always applies exact penalties specified in filters
+- Catches AI mistakes
+- Ensures consistent behavior across evaluations
+
+### Filter Lifecycle
+
+```
+1. Creation
+   ├─ Interactive (during feedback when rejecting)
+   └─ Manual (edit screening_filters.json)
+
+2. Storage
+   └─ Per-job: data/jobs/{job_name}/screening_filters.json
+
+3. Application
+   ├─ Load filters when evaluating
+   ├─ AI checks conditions
+   ├─ AI applies penalties
+   └─ Policy layer enforces (double-check)
+
+4. Reporting
+   ├─ Failed filters shown in detailed_notes
+   ├─ Flags in CSV/HTML reports
+   └─ Clear explanation of why candidate was filtered
+```
+
+### Filter Schema
+
+```json
+{
+  "version": 1,
+  "updated_at": "ISO-8601 timestamp",
+  "filters": [
+    {
+      "id": "unique-filter-id",
+      "title": "Human-readable title",
+      "when": "Condition description for AI",
+      "action": {
+        "set_recommendation": "NO | MAYBE | YES | ...",
+        "cap_recommendation": "NO | MAYBE | YES | ...",
+        "deduct_points": 0-100
+      },
+      "enabled": true,
+      "source": "human | system",
+      "rationale": "Why this filter exists"
+    }
+  ]
+}
+```
+
+### Integration Points
+
+- **candidate_reviewer.py**: CLI for feedback and filter creation
+- **ai_client.py**: Reads filters, includes in prompt
+- **policy/filter_enforcer.py**: Post-evaluation enforcement
+- **feedback_manager.py**: Re-evaluation with filters
+- **output_generator.py**: Display filter results in reports
+
+## Re-evaluation System
+
+### Features
+
+**Smart Re-evaluation** (`feedback_manager.py`):
+- Processes candidates in score order (highest first)
+- Skips rejected candidates by default (unless explicitly specified)
+- Shows score deltas: "was 60 → now 75 | Δ +15"
+- Cleans up stale duplicate warnings before re-evaluation
+- Progress indicators: "Re-evaluating 3/10..."
+
+**Evaluation History Tracking**:
+- Previous evaluations saved to `evaluation_history.json`
+- Enables auditing and rollback
+- Tracks how insights/filters improved evaluations
+
+**Insights Application**:
+- Loads job insights from `insights.json`
+- Passes insights to AI during evaluation
+- Insights help AI better match human preferences
+
+### Re-evaluation Triggers
+
+1. **After feedback** - Manual re-evaluation after providing feedback
+2. **After insights** - System suggests re-evaluation when new insights generated
+3. **After filter changes** - Re-evaluate to apply new/modified filters
+
+### Performance Optimization
+
+- **Highest scores first**: Focus on top candidates
+- **Skip rejected**: Don't waste API calls on already-rejected candidates
+- **Batch reports**: Generate reports once after all re-evaluations complete
+
+## See Also
+
+- **[SCREENING_FILTERS.md](SCREENING_FILTERS.md)** - Complete guide to screening filters
+- **[README.md](README.md)** - User documentation
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development guide
