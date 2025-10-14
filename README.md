@@ -777,4 +777,4 @@ Built with:
 
 ---
 
-**Ready to transform your hiring process?** [Get started now](#5-minute-setup)
+**Ready to transform your hiring process?** [Get started now](https://github.com/KjellKod/ai_job_candidate_reviewer?tab=readme-ov-file#5-minute-setup)
