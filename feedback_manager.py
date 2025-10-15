@@ -135,7 +135,7 @@ class FeedbackManager:
             generated_insights=insights_text,
             feedback_count=len(feedback_records),
             effectiveness_metrics=self._calculate_effectiveness_metrics(
-                feedback_records
+                feedback_records, job_name
             ),
         )
 
@@ -534,18 +534,51 @@ class FeedbackManager:
         Returns:
             True if candidate is rejected, False otherwise
         """
+        # First check the exact candidate directory
         candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
         meta_path = candidate_dir / "candidate_meta.json"
 
-        if not meta_path.exists():
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    if meta.get("rejected", False):
+                        return True
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # Also check other directories that might be the same candidate
+        # (due to deduplication/name variations)
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
             return False
 
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-                return meta.get("rejected", False)
-        except (json.JSONDecodeError, KeyError):
-            return False
+        # Import needed for name comparison
+        from output_generator import OutputGenerator
+
+        output_gen = OutputGenerator(self.config)
+
+        for other_dir in candidates_path.iterdir():
+            if not other_dir.is_dir():
+                continue
+
+            # Skip if it's the same directory we already checked
+            if other_dir == candidate_dir:
+                continue
+
+            # Check if this directory represents the same candidate
+            if output_gen._are_same_candidate(candidate_name, other_dir.name):
+                other_meta_path = other_dir / "candidate_meta.json"
+                if other_meta_path.exists():
+                    try:
+                        with open(other_meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                            if meta.get("rejected", False):
+                                return True
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+
+        return False
 
     def _load_candidate_data(self, candidate_dir: Path):
         """Load candidate data from directory."""
@@ -622,26 +655,90 @@ class FeedbackManager:
             json.dump(history, f, indent=2, ensure_ascii=False)
 
     def _calculate_effectiveness_metrics(
-        self, feedback_records: List[FeedbackRecord]
+        self,
+        feedback_records: List[FeedbackRecord],
+        job_name: Optional[str] = None,
     ) -> Dict[str, float]:
-        """Calculate effectiveness metrics from feedback."""
-        if not feedback_records:
-            return {}
+        """Calculate effectiveness metrics from feedback and candidate set.
 
-        # Calculate agreement rate
-        agreements = 0
+        Args:
+            feedback_records: List of feedback records for the job
+            job_name: Optional job name for enhanced metrics calculation. If provided,
+                      includes implicit agreements from candidates without feedback.
+                      If None, only explicit feedback is used.
+
+        Returns:
+            Dictionary containing effectiveness metrics including agreement_rate,
+            explicit_agreements, explicit_disagreements, and other statistics.
+        """
+        feedback_given = len(feedback_records)
+
+        # Count explicit agreements (feedback where human == AI)
+        explicit_agreements = 0
         for record in feedback_records:
             ai_rec = record.original_evaluation.recommendation.value
             human_rec = record.human_feedback.human_recommendation.value
-
-            # Simple agreement check (could be more sophisticated)
             if ai_rec == human_rec:
-                agreements += 1
+                explicit_agreements += 1
 
-        agreement_rate = agreements / len(feedback_records)
+        explicit_disagreements = max(feedback_given - explicit_agreements, 0)
+
+        # If no job_name provided, use legacy calculation based only on explicit feedback
+        if not job_name:
+            return self._legacy_effectiveness_metrics(
+                feedback_given, explicit_agreements
+            )
+
+        # Enhanced calculation: include implicit agreements from candidates without feedback
+        candidates_path = Path(self.config.candidates_path) / job_name
+        total_candidates = (
+            len([d for d in candidates_path.iterdir() if d.is_dir()])
+            if candidates_path.exists()
+            else 0
+        )
+
+        # If we can't determine total candidates properly (directory doesn't exist, is empty,
+        # or has fewer candidates than feedback records, which can happen in test environments),
+        # fall back to legacy calculation based only on explicit feedback
+        if total_candidates < feedback_given:
+            return self._legacy_effectiveness_metrics(
+                feedback_given, explicit_agreements
+            )
+
+        # Assume no-feedback implies implicit agreement (user didn't need to correct)
+        no_feedback_count = max(total_candidates - feedback_given, 0)
+
+        total_agreements = explicit_agreements + no_feedback_count
+        agreement_rate = (
+            (total_agreements / total_candidates) if total_candidates > 0 else 0.0
+        )
 
         return {
             "agreement_rate": agreement_rate,
-            "total_feedback": len(feedback_records),
+            "explicit_agreements": explicit_agreements,
+            "explicit_disagreements": explicit_disagreements,
+            "no_feedback_count": no_feedback_count,
+            "total_feedback": feedback_given,
+            "total_candidates": total_candidates,
+            "last_calculated": datetime.now().timestamp(),
+        }
+
+    def _legacy_effectiveness_metrics(
+        self, feedback_given: int, explicit_agreements: int
+    ) -> Dict[str, float]:
+        """Legacy metrics based solely on explicit feedback.
+
+        Used when job context (candidate count) is unavailable or unreliable.
+        """
+        explicit_disagreements = max(feedback_given - explicit_agreements, 0)
+        return {
+            "agreement_rate": (
+                explicit_agreements / feedback_given if feedback_given > 0 else 0.0
+            ),
+            "explicit_agreements": explicit_agreements,
+            "explicit_disagreements": explicit_disagreements,
+            "no_feedback_count": 0,
+            "total_feedback": feedback_given,
+            "total_candidates": feedback_given,
             "last_calculated": datetime.now().timestamp(),
         }
