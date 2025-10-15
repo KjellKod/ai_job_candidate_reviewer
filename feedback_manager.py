@@ -135,7 +135,7 @@ class FeedbackManager:
             generated_insights=insights_text,
             feedback_count=len(feedback_records),
             effectiveness_metrics=self._calculate_effectiveness_metrics(
-                job_name, feedback_records
+                feedback_records, job_name
             ),
         )
 
@@ -654,57 +654,23 @@ class FeedbackManager:
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2, ensure_ascii=False)
 
-    def _calculate_effectiveness_metrics(self, *args, **kwargs) -> Dict[str, float]:
+    def _calculate_effectiveness_metrics(
+        self,
+        feedback_records: List[FeedbackRecord],
+        job_name: Optional[str] = None,
+    ) -> Dict[str, float]:
         """Calculate effectiveness metrics from feedback and candidate set.
 
-        Backwards compatible with previous signature _calculate_effectiveness_metrics(feedback_records)
-        and new signature _calculate_effectiveness_metrics(job_name, feedback_records).
+        Args:
+            feedback_records: List of feedback records for the job
+            job_name: Optional job name for enhanced metrics calculation. If provided,
+                      includes implicit agreements from candidates without feedback.
+                      If None, only explicit feedback is used.
 
-        Computes explicit agreements/disagreements from feedback and treats
-        candidates without feedback as implicit agreements for a more realistic
-        agreement rate when feedback is mostly given on disagreements.
+        Returns:
+            Dictionary containing effectiveness metrics including agreement_rate,
+            explicit_agreements, explicit_disagreements, and other statistics.
         """
-        # Parse arguments to support both call styles
-        job_name = None
-        feedback_records: List[FeedbackRecord] = []
-        if len(args) == 1 and isinstance(args[0], list):
-            feedback_records = args[0]
-            job_name = feedback_records[0].job_name if feedback_records else None
-        elif len(args) >= 2 and isinstance(args[1], list):
-            job_name = args[0]
-            feedback_records = args[1]
-        else:
-            # Try kwargs
-            feedback_records = kwargs.get("feedback_records", [])
-            job_name = kwargs.get("job_name")
-
-        # Fallback to legacy behavior if job_name cannot be determined
-        if not job_name:
-            agreements = 0
-            for record in feedback_records or []:
-                ai_rec = record.original_evaluation.recommendation.value
-                human_rec = record.human_feedback.human_recommendation.value
-                if ai_rec == human_rec:
-                    agreements += 1
-            total = len(feedback_records) or 1
-            return {
-                "agreement_rate": agreements / total,
-                "explicit_agreements": agreements,
-                "explicit_disagreements": max(total - agreements, 0),
-                "no_feedback_count": 0,
-                "total_feedback": len(feedback_records or []),
-                "total_candidates": len(feedback_records or []),
-                "last_calculated": datetime.now().timestamp(),
-            }
-
-        # Total candidates for this job
-        candidates_path = Path(self.config.candidates_path) / job_name
-        total_candidates = (
-            len([d for d in candidates_path.iterdir() if d.is_dir()])
-            if candidates_path.exists()
-            else 0
-        )
-
         feedback_given = len(feedback_records or [])
 
         # Count explicit agreements (feedback where human == AI)
@@ -716,6 +682,28 @@ class FeedbackManager:
                 explicit_agreements += 1
 
         explicit_disagreements = max(feedback_given - explicit_agreements, 0)
+
+        # If no job_name provided, use legacy calculation based only on explicit feedback
+        if not job_name:
+            return {
+                "agreement_rate": (
+                    explicit_agreements / feedback_given if feedback_given > 0 else 0.0
+                ),
+                "explicit_agreements": explicit_agreements,
+                "explicit_disagreements": explicit_disagreements,
+                "no_feedback_count": 0,
+                "total_feedback": feedback_given,
+                "total_candidates": feedback_given,
+                "last_calculated": datetime.now().timestamp(),
+            }
+
+        # Enhanced calculation: include implicit agreements from candidates without feedback
+        candidates_path = Path(self.config.candidates_path) / job_name
+        total_candidates = (
+            len([d for d in candidates_path.iterdir() if d.is_dir()])
+            if candidates_path.exists()
+            else 0
+        )
 
         # If we can't determine total candidates properly (directory doesn't exist, is empty,
         # or has fewer candidates than feedback records, which can happen in test environments),
