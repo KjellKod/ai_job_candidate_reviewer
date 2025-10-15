@@ -199,18 +199,48 @@ class CandidateReviewer:
         Returns:
             True if candidate is rejected, False otherwise
         """
+        # First check the exact candidate directory
         candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
         meta_path = candidate_dir / "candidate_meta.json"
 
-        if not meta_path.exists():
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    if meta.get("rejected", False):
+                        return True
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # Also check other directories that might be the same candidate
+        # (due to deduplication/name variations)
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
             return False
 
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-                return meta.get("rejected", False)
-        except (json.JSONDecodeError, KeyError):
-            return False
+        for other_dir in candidates_path.iterdir():
+            if not other_dir.is_dir():
+                continue
+
+            # Skip if it's the same directory we already checked
+            if other_dir == candidate_dir:
+                continue
+
+            # Check if this directory represents the same candidate
+            if self.output_generator._are_same_candidate(
+                candidate_name, other_dir.name
+            ):
+                other_meta_path = other_dir / "candidate_meta.json"
+                if other_meta_path.exists():
+                    try:
+                        with open(other_meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                            if meta.get("rejected", False):
+                                return True
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+
+        return False
 
     def _get_rejection_info(self, job_name: str, candidate_name: str) -> Optional[dict]:
         """Get rejection information for a candidate.
@@ -222,22 +252,58 @@ class CandidateReviewer:
         Returns:
             Dict with rejection info or None if not rejected
         """
+        # First check the exact candidate directory
         candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
         meta_path = candidate_dir / "candidate_meta.json"
 
-        if not meta_path.exists():
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    if meta.get("rejected", False):
+                        return {
+                            "reason": meta.get(
+                                "rejection_reason", "No reason provided"
+                            ),
+                            "timestamp": meta.get("rejection_timestamp", "Unknown"),
+                        }
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # Also check other directories that might be the same candidate
+        # (due to deduplication/name variations)
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
             return None
 
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-                if meta.get("rejected", False):
-                    return {
-                        "reason": meta.get("rejection_reason", "No reason provided"),
-                        "timestamp": meta.get("rejection_timestamp", "Unknown"),
-                    }
-        except (json.JSONDecodeError, KeyError):
-            pass
+        for other_dir in candidates_path.iterdir():
+            if not other_dir.is_dir():
+                continue
+
+            # Skip if it's the same directory we already checked
+            if other_dir == candidate_dir:
+                continue
+
+            # Check if this directory represents the same candidate
+            if self.output_generator._are_same_candidate(
+                candidate_name, other_dir.name
+            ):
+                other_meta_path = other_dir / "candidate_meta.json"
+                if other_meta_path.exists():
+                    try:
+                        with open(other_meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                            if meta.get("rejected", False):
+                                return {
+                                    "reason": meta.get(
+                                        "rejection_reason", "No reason provided"
+                                    ),
+                                    "timestamp": meta.get(
+                                        "rejection_timestamp", "Unknown"
+                                    ),
+                                }
+                    except (json.JSONDecodeError, KeyError):
+                        pass
 
         return None
 
@@ -1605,8 +1671,23 @@ class CandidateReviewer:
             )
 
             if insights.effectiveness_metrics:
-                agreement_rate = insights.effectiveness_metrics.get("agreement_rate", 0)
-                print(f"Agreement rate: {agreement_rate:.1%}")
+                metrics = insights.effectiveness_metrics
+                print("\n📊 Effectiveness Metrics:")
+                print(f"   Agreement rate: {metrics.get('agreement_rate', 0):.1%}")
+                if "explicit_agreements" in metrics:
+                    print(
+                        f"   Explicit agreements: {metrics.get('explicit_agreements', 0)}"
+                    )
+                if "explicit_disagreements" in metrics:
+                    print(
+                        f"   Disagreements: {metrics.get('explicit_disagreements', 0)}"
+                    )
+                if "no_feedback_count" in metrics:
+                    print(
+                        f"   Not yet reviewed/Implicit agreement: {metrics.get('no_feedback_count', 0)}"
+                    )
+                if "total_candidates" in metrics:
+                    print(f"   Total candidates: {metrics.get('total_candidates', 0)}")
 
             print("\n📝 Generated Insights:")
 
@@ -2317,6 +2398,36 @@ def show_candidates(ctx, job_name: str):
     job_name = resolved
     print(f"📋 Job: {job_name}")
     reviewer._print_model_info("displaying candidates")
+    # Show AI performance metrics (if insights exist)
+    try:
+        job_dir = Path(reviewer.config.get_job_path(job_name))
+        insights_path = job_dir / "insights.json"
+        if insights_path.exists():
+            with open(insights_path, "r", encoding="utf-8") as f:
+                insights_data = json.load(f)
+                metrics = insights_data.get("effectiveness_metrics", {})
+                if metrics:
+                    print("\n📊 AI Performance:")
+                    print(f"   Agreement rate: {metrics.get('agreement_rate', 0):.1%}")
+                    if "explicit_agreements" in metrics:
+                        print(
+                            f"   Explicit agreements: {metrics.get('explicit_agreements', 0)}"
+                        )
+                    if "explicit_disagreements" in metrics:
+                        print(
+                            f"   Disagreements: {metrics.get('explicit_disagreements', 0)}"
+                        )
+                    if "no_feedback_count" in metrics:
+                        print(
+                            f"   Not yet reviewed/Implicit agreement: {metrics.get('no_feedback_count', 0)}"
+                        )
+                    if "total_candidates" in metrics:
+                        print(
+                            f"   Total candidates: {metrics.get('total_candidates', 0)}"
+                        )
+                    print()
+    except Exception:
+        pass
     result = reviewer.show_candidates(job_name)
 
     if not result.success:

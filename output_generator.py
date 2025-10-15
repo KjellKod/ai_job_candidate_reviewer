@@ -182,6 +182,38 @@ class OutputGenerator:
         # Summary statistics for active candidates
         self._display_summary_stats(sorted_active)
 
+        # Also show AI performance metrics (if insights exist for this job)
+        try:
+            job_dir = Path(self.config.get_job_path(job_name))
+            insights_path = job_dir / "insights.json"
+            if insights_path.exists():
+                with open(insights_path, "r", encoding="utf-8") as f:
+                    insights_data = json.load(f)
+                    metrics = insights_data.get("effectiveness_metrics", {})
+                    if metrics:
+                        print("\n📊 AI Performance:")
+                        print(
+                            f"   Agreement rate: {metrics.get('agreement_rate', 0):.1%}"
+                        )
+                        if "explicit_agreements" in metrics:
+                            print(
+                                f"   Explicit agreements: {metrics.get('explicit_agreements', 0)}"
+                            )
+                        if "explicit_disagreements" in metrics:
+                            print(
+                                f"   Disagreements: {metrics.get('explicit_disagreements', 0)}"
+                            )
+                        if "no_feedback_count" in metrics:
+                            print(
+                                f"   Not yet reviewed/Implicit agreement: {metrics.get('no_feedback_count', 0)}"
+                            )
+                        if "total_candidates" in metrics:
+                            print(
+                                f"   Total candidates: {metrics.get('total_candidates', 0)}"
+                            )
+        except Exception:
+            pass
+
         # Display rejected candidates section if there are any
         if sorted_rejected:
             print("\n" + "─" * 80)
@@ -607,6 +639,32 @@ class OutputGenerator:
     </div>
 """
 
+        # Add AI performance metrics (if available)
+        try:
+            job_dir = Path(self.config.get_job_path(job_context.name))
+            insights_path = job_dir / "insights.json"
+            if insights_path.exists():
+                with open(insights_path, "r", encoding="utf-8") as f:
+                    insights_data = json.load(f)
+                    metrics = insights_data.get("effectiveness_metrics", {})
+                    if metrics:
+                        html += """
+    <div class="stats">
+        <h3>AI Performance Metrics</h3>
+"""
+                        html += f"        <p><strong>Agreement Rate:</strong> {metrics.get('agreement_rate', 0):.1%}</p>\n"
+                        if "explicit_agreements" in metrics:
+                            html += f"        <p><strong>Explicit Agreements:</strong> {metrics.get('explicit_agreements', 0)}</p>\n"
+                        if "explicit_disagreements" in metrics:
+                            html += f"        <p><strong>Disagreements (Learning from):</strong> {metrics.get('explicit_disagreements', 0)}</p>\n"
+                        if "no_feedback_count" in metrics:
+                            html += f"        <p><strong>Not Yet Reviewed/Implicit Agreement:</strong> {metrics.get('no_feedback_count', 0)}</p>\n"
+                        if "total_candidates" in metrics:
+                            html += f"        <p><strong>Total Candidates:</strong> {metrics.get('total_candidates', 0)}</p>\n"
+                        html += "    </div>\n"
+        except Exception:
+            pass
+
         if stats:
             html += f"""
     <div class="stats">
@@ -718,18 +776,46 @@ class OutputGenerator:
         Returns:
             True if candidate is rejected, False otherwise
         """
+        # First check the exact candidate directory
         candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
         meta_path = candidate_dir / "candidate_meta.json"
 
-        if not meta_path.exists():
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    if meta.get("rejected", False):
+                        return True
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # Also check other directories that might be the same candidate
+        # (due to deduplication/name variations)
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
             return False
 
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-                return meta.get("rejected", False)
-        except (json.JSONDecodeError, KeyError):
-            return False
+        for other_dir in candidates_path.iterdir():
+            if not other_dir.is_dir():
+                continue
+
+            # Skip if it's the same directory we already checked
+            if other_dir == candidate_dir:
+                continue
+
+            # Check if this directory represents the same candidate
+            if self._are_same_candidate(candidate_name, other_dir.name):
+                other_meta_path = other_dir / "candidate_meta.json"
+                if other_meta_path.exists():
+                    try:
+                        with open(other_meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                            if meta.get("rejected", False):
+                                return True
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+
+        return False
 
     def _get_rejection_info(self, job_name: str, candidate_name: str) -> Optional[dict]:
         """Get rejection information for a candidate.
@@ -741,22 +827,56 @@ class OutputGenerator:
         Returns:
             Dict with rejection info or None if not rejected
         """
+        # First check the exact candidate directory
         candidate_dir = Path(self.config.get_candidate_path(job_name, candidate_name))
         meta_path = candidate_dir / "candidate_meta.json"
 
-        if not meta_path.exists():
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    if meta.get("rejected", False):
+                        return {
+                            "reason": meta.get(
+                                "rejection_reason", "No reason provided"
+                            ),
+                            "timestamp": meta.get("rejection_timestamp", "Unknown"),
+                        }
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # Also check other directories that might be the same candidate
+        # (due to deduplication/name variations)
+        candidates_path = Path(self.config.candidates_path) / job_name
+        if not candidates_path.exists():
             return None
 
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-                if meta.get("rejected", False):
-                    return {
-                        "reason": meta.get("rejection_reason", "No reason provided"),
-                        "timestamp": meta.get("rejection_timestamp", "Unknown"),
-                    }
-        except (json.JSONDecodeError, KeyError):
-            pass
+        for other_dir in candidates_path.iterdir():
+            if not other_dir.is_dir():
+                continue
+
+            # Skip if it's the same directory we already checked
+            if other_dir == candidate_dir:
+                continue
+
+            # Check if this directory represents the same candidate
+            if self._are_same_candidate(candidate_name, other_dir.name):
+                other_meta_path = other_dir / "candidate_meta.json"
+                if other_meta_path.exists():
+                    try:
+                        with open(other_meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                            if meta.get("rejected", False):
+                                return {
+                                    "reason": meta.get(
+                                        "rejection_reason", "No reason provided"
+                                    ),
+                                    "timestamp": meta.get(
+                                        "rejection_timestamp", "Unknown"
+                                    ),
+                                }
+                    except (json.JSONDecodeError, KeyError):
+                        pass
 
         return None
 
