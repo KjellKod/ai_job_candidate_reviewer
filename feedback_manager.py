@@ -671,11 +671,11 @@ class FeedbackManager:
             Dictionary containing effectiveness metrics including agreement_rate,
             explicit_agreements, explicit_disagreements, and other statistics.
         """
-        feedback_given = len(feedback_records or [])
+        feedback_given = len(feedback_records)
 
         # Count explicit agreements (feedback where human == AI)
         explicit_agreements = 0
-        for record in feedback_records or []:
+        for record in feedback_records:
             ai_rec = record.original_evaluation.recommendation.value
             human_rec = record.human_feedback.human_recommendation.value
             if ai_rec == human_rec:
@@ -685,17 +685,9 @@ class FeedbackManager:
 
         # If no job_name provided, use legacy calculation based only on explicit feedback
         if not job_name:
-            return {
-                "agreement_rate": (
-                    explicit_agreements / feedback_given if feedback_given > 0 else 0.0
-                ),
-                "explicit_agreements": explicit_agreements,
-                "explicit_disagreements": explicit_disagreements,
-                "no_feedback_count": 0,
-                "total_feedback": feedback_given,
-                "total_candidates": feedback_given,
-                "last_calculated": datetime.now().timestamp(),
-            }
+            return self._legacy_effectiveness_metrics(
+                feedback_given, explicit_agreements
+            )
 
         # Enhanced calculation: include implicit agreements from candidates without feedback
         candidates_path = Path(self.config.candidates_path) / job_name
@@ -709,17 +701,9 @@ class FeedbackManager:
         # or has fewer candidates than feedback records, which can happen in test environments),
         # fall back to legacy calculation based only on explicit feedback
         if total_candidates < feedback_given:
-            return {
-                "agreement_rate": (
-                    explicit_agreements / feedback_given if feedback_given > 0 else 0.0
-                ),
-                "explicit_agreements": explicit_agreements,
-                "explicit_disagreements": explicit_disagreements,
-                "no_feedback_count": 0,
-                "total_feedback": feedback_given,
-                "total_candidates": feedback_given,
-                "last_calculated": datetime.now().timestamp(),
-            }
+            return self._legacy_effectiveness_metrics(
+                feedback_given, explicit_agreements
+            )
 
         # Assume no-feedback implies implicit agreement (user didn't need to correct)
         no_feedback_count = max(total_candidates - feedback_given, 0)
@@ -736,5 +720,25 @@ class FeedbackManager:
             "no_feedback_count": no_feedback_count,
             "total_feedback": feedback_given,
             "total_candidates": total_candidates,
+            "last_calculated": datetime.now().timestamp(),
+        }
+
+    def _legacy_effectiveness_metrics(
+        self, feedback_given: int, explicit_agreements: int
+    ) -> Dict[str, float]:
+        """Legacy metrics based solely on explicit feedback.
+
+        Used when job context (candidate count) is unavailable or unreliable.
+        """
+        explicit_disagreements = max(feedback_given - explicit_agreements, 0)
+        return {
+            "agreement_rate": (
+                explicit_agreements / feedback_given if feedback_given > 0 else 0.0
+            ),
+            "explicit_agreements": explicit_agreements,
+            "explicit_disagreements": explicit_disagreements,
+            "no_feedback_count": 0,
+            "total_feedback": feedback_given,
+            "total_candidates": feedback_given,
             "last_calculated": datetime.now().timestamp(),
         }
