@@ -15,6 +15,35 @@ Screening filters allow you to define hard rules that the AI **must** enforce du
 
 ## How It Works
 
+### TL;DR (visual)
+
+```mermaid
+flowchart TD
+  A[Author filters<br/>data/jobs/<job>/screening_filters.json] --> B[AIClient builds evaluation prompt<br/>includes DECISION FILTERS (plain text when/action)]
+  B --> C[OpenAI evaluates candidate<br/>returns JSON + notes]
+  C --> C1{Signals present?}
+  C1 -->|rules_applied list| C2[Ensure notes start with<br/>'Failed filters: id1, id2' (post-parse)]
+  C1 -->|no list| C2
+  C2 --> D[Policy enforcement<br/>policy/filter_enforcer.py]
+  D --> D1[Parse 'Failed filters' from notes<br/>(ids)]
+  D1 --> E{Map ids → actions}
+  E -->|deduct_points| F[Decrease overall_score]
+  E -->|set_recommendation| G[Force recommendation]
+  E -->|cap_recommendation| H[Cap recommendation]
+  F --> I[Final Evaluation]
+  G --> I
+  H --> I
+  I --> J[Output: CSV / HTML / Terminal]
+  J --> K{Feedback?}
+  K -->|>= 2 feedbacks| L[Generate insights<br/>data/jobs/<job>/insights.json]
+  L --> B
+```
+
+Key points:
+- Filters are human-authored plain text; the AI detects violations from them.
+- Actual penalties and recommendation changes are applied deterministically after AI.
+- “Failed filters: …” at the top of `detailed_notes` is the enforcement trigger.
+
 ### Two-Layer Architecture
 
 The system uses a hybrid approach for maximum reliability:

@@ -180,6 +180,18 @@ flowchart TD
     style Output fill:#ffe1f5
 ```
 
+### How Rankings + Filters Work (brief)
+
+Evaluations produce a score (0–100), a recommendation (STRONG_YES → STRONG_NO), and an interview priority (HIGH/MEDIUM/LOW). You can optionally add **Screening Filters** to automatically reject or adjust candidates who don’t meet must-have criteria (e.g., “require 5+ years Python”).
+
+- Filters are defined in plain text and embedded into the AI prompt as must-enforce rules.
+- The AI flags any failed filters; a deterministic policy layer then applies actions:
+  - `set_recommendation` (hard rejection)
+  - `cap_recommendation` (limit maximum recommendation)
+  - `deduct_points` (score penalty)
+
+See full details and examples: [Screening Filters Guide](SCREENING_FILTERS.md)
+
 ### Simple Explanation
 
 1. **Drop Files** → You organize files by name (no complex paths)
