@@ -43,7 +43,7 @@ python3 candidate_reviewer.py show-candidates "software_engineer"
   ```bash
   python3 candidate_reviewer.py re-evaluate "software_engineer"  # all of them 
   python3 candidate_reviewer.py re-evaluate "software_engineer" -c john_doe # just joe
-   python3 candidate_reviewer.py re-evaluate "software_engineer" -c "John Doe" # just joe
+  python3 candidate_reviewer.py re-evaluate "software_engineer" -c "John Doe" # just joe
   ```
 - Add screening filters (hard rules) during feedback to auto-reject/mute mismatches
 
