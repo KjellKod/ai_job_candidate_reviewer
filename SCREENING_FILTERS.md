@@ -21,7 +21,7 @@ Screening filters allow you to define hard rules that the AI **must** enforce du
 flowchart TD
   A["Author filters<br/>data/jobs/&lt;job&gt;/screening_filters.json"] --> B["AIClient builds evaluation prompt<br/>includes DECISION FILTERS (plain text when/action)"]
   B --> C["OpenAI evaluates candidate<br/>returns JSON + notes"]
-  C --> C1{"Signals present?"}
+  C --> C1{"Screening Filters Matched?"}
   C1 -->|rules_applied list| C2["Ensure notes start with<br/>'Failed filters: id1, id2' (post-parse)"]
   C1 -->|no list| I
   C2 --> D["Policy enforcement<br/>policy/filter_enforcer.py"]
