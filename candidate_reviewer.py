@@ -2200,7 +2200,11 @@ class OrderedGroup(click.Group):
                 cmd = self.get_command(ctx, name)
                 if cmd is None or getattr(cmd, "hidden", False):
                     continue
-                short = cmd.get_short_help_str() if hasattr(cmd, "get_short_help_str") else (cmd.help or "")
+                short = (
+                    cmd.get_short_help_str()
+                    if hasattr(cmd, "get_short_help_str")
+                    else (cmd.help or "")
+                )
                 rows.append((name, short))
             if rows:
                 formatter.write_heading(title)
@@ -2661,7 +2665,9 @@ def reset_candidates(ctx, job_name: str):
         sys.exit(1)
     job_name = resolved
     print(f"📋 Job: {job_name}")
-    print("\n⚠️  DANGER: This will permanently delete candidate folders and reports for this job.")
+    print(
+        "\n⚠️  DANGER: This will permanently delete candidate folders and reports for this job."
+    )
     print("Type the job name exactly to proceed, or anything else to cancel.")
     try:
         confirm = input("Confirm job name: ").strip()
