@@ -23,7 +23,7 @@ flowchart TD
   B --> C["OpenAI evaluates candidate<br/>returns JSON + notes"]
   C --> C1{"Signals present?"}
   C1 -->|rules_applied list| C2["Ensure notes start with<br/>'Failed filters: id1, id2' (post-parse)"]
-  C1 -->|no list| C2
+  C1 -->|no list| U
   C2 --> D["Policy enforcement<br/>policy/filter_enforcer.py"]
   D --> D1["Parse 'Failed filters' from notes<br/>(ids)"]
   D1 --> E{"Map ids → actions"}

@@ -35,11 +35,15 @@ python3 candidate_reviewer.py show-candidates "software_engineer"
 ## Next Steps (2 mins)
 - Provide feedback to teach the AI:
   ```bash
-  python3 candidate_reviewer.py provide-feedback "software_engineer" 1
+  python3 candidate_reviewer.py provide-feedback "software_engineer" "john_doe"
+  python3 candidate_reviewer.py provide-feedback "software_engineer" 1 #where john doe has the list id of '1'
+  
   ```
 - Re-evaluate with insights (auto-suggested every 2 feedbacks):
   ```bash
-  python3 candidate_reviewer.py re-evaluate "software_engineer"
+  python3 candidate_reviewer.py re-evaluate "software_engineer"  # all of them 
+  python3 candidate_reviewer.py re-evaluate "software_engineer" -c john_doe # just joe
+   python3 candidate_reviewer.py re-evaluate "software_engineer" -c "John Doe" # just joe
   ```
 - Add screening filters (hard rules) during feedback to auto-reject/mute mismatches
 
@@ -53,7 +57,7 @@ data/
 ```
 
 ## Learn the System (skim)
-- Screening filters (must‑have rules): see [SCREENING_FILTERS.md](SCREENING_FILTERS.md)
+- Screening filters (candidate 'must‑have qualities' rules): see [SCREENING_FILTERS.md](SCREENING_FILTERS.md)
 - How rankings + filters work: see “How It Works” in [README.md](README.md)
 - Architecture overview (one screen): see [ARCHITECTURE.md](ARCHITECTURE.md)
 
