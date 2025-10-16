@@ -2174,8 +2174,57 @@ class CandidateReviewer:
         return False
 
 
+class OrderedGroup(click.Group):
+    """Custom Click group to present commands in logical sections for --help."""
+
+    COMMON = [
+        "setup-job",
+        "process-candidates",
+        "show-candidates",
+        "provide-feedback",
+        "re-evaluate",
+        "open-reports",
+        "list-jobs",
+        "show-insights",
+    ]
+
+    DANGEROUS = [
+        "clean-intake",
+        "reset-candidates",
+    ]
+
+    def format_commands(self, ctx, formatter):  # type: ignore[override]
+        def render_section(title: str, names: List[str]) -> None:
+            rows = []
+            for name in names:
+                cmd = self.get_command(ctx, name)
+                if cmd is None or getattr(cmd, "hidden", False):
+                    continue
+                short = (
+                    cmd.get_short_help_str()
+                    if hasattr(cmd, "get_short_help_str")
+                    else (cmd.help or "")
+                )
+                rows.append((name, short))
+            if rows:
+                formatter.write_heading(title)
+                with formatter.indentation():
+                    formatter.write_dl(rows)
+                formatter.write("\n")
+
+        all_names = list(self.commands.keys())
+        common = [n for n in self.COMMON if n in self.commands]
+        dangerous = [n for n in self.DANGEROUS if n in self.commands]
+        remaining = [n for n in all_names if n not in common and n not in dangerous]
+        remaining.sort()
+
+        render_section("Common commands", common)
+        render_section("Other commands", remaining)
+        render_section("Danger zone (use with caution)", dangerous)
+
+
 # CLI Interface
-@click.group(invoke_without_command=True)
+@click.group(cls=OrderedGroup, invoke_without_command=True)
 @click.pass_context
 def cli(ctx):
     """AI Job Candidate Reviewer - Automate resume screening with AI assistance."""
@@ -2587,26 +2636,48 @@ def list_reports(ctx, job_name: str):
     reviewer.list_reports(job_name)
 
 
-@cli.command()
+@cli.command(help="Delete processed files from intake (dangerous).")
 @click.pass_context
 def clean_intake(ctx):
-    """Clean up processed candidate files from intake directory."""
+    """Clean up processed candidate files from intake directory (dangerous)."""
     reviewer = ctx.obj["reviewer"]
-    reviewer.clean_intake()
+    print("\n⚠️  DANGER: This will delete files from intake.")
+    print("Type 'clean' to proceed, or anything else to cancel.")
+    try:
+        confirm = input("Confirm: ").strip().lower()
+    except KeyboardInterrupt:
+        print("\n❌ Cleanup cancelled")
+        return
+    if confirm == "clean":
+        reviewer.clean_intake()
+    else:
+        print("❌ Cleanup cancelled")
 
 
-@cli.command()
+@cli.command(help="Delete all candidates and reports; keeps job setup & AI insights.")
 @click.argument("job_name")
 @click.pass_context
 def reset_candidates(ctx, job_name: str):
-    """Reset all candidates for a job while keeping job setup and AI insights."""
+    """Permanently delete candidate folders and reports for a job; keeps job setup and AI insights (dangerous)."""
     reviewer = ctx.obj["reviewer"]
     resolved = reviewer._resolve_job_identifier(job_name)
     if not resolved:
         sys.exit(1)
     job_name = resolved
     print(f"📋 Job: {job_name}")
-    reviewer.reset_candidates(job_name)
+    print(
+        "\n⚠️  DANGER: This will permanently delete candidate folders and reports for this job."
+    )
+    print("Type the job name exactly to proceed, or anything else to cancel.")
+    try:
+        confirm = input("Confirm job name: ").strip()
+    except KeyboardInterrupt:
+        print("\n❌ Reset cancelled")
+        return
+    if confirm == job_name:
+        reviewer.reset_candidates(job_name)
+    else:
+        print("❌ Reset cancelled")
 
 
 @cli.command()

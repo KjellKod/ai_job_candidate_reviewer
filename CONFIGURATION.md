@@ -1,8 +1,21 @@
-# Configuration Guide
+# Configuration (TL;DR)
 
-## Environment Variables
+Who is this for: Anyone setting up the tool or CI.
 
-The AI Job Candidate Reviewer can be configured using environment variables in a `.env` file.
+## Required vs Optional
+
+| Setting | Required | Default | Purpose |
+|--------|----------|---------|---------|
+| `OPENAI_API_KEY` | Yes | — | Enables AI evaluations |
+| `BASE_DATA_PATH` | No | `./data` | Root for jobs, candidates, output |
+| `OPENAI_MODEL` | No | auto‑select | Force a specific model |
+| `MAX_FILE_SIZE_MB` | No | `2` | PDF/app file size limit |
+
+Create `.env`:
+```bash
+cp .env.example .env
+echo "OPENAI_API_KEY=sk-proj-your-key" >> .env
+```
 
 ### Required Configuration
 
@@ -22,7 +35,7 @@ OPENAI_API_KEY=sk-proj-your-api-key-here
 
 **Get your API key:** https://platform.openai.com/api-keys
 
-### Optional Configuration
+## Optional Configuration
 
 #### `OPENAI_MODEL` (Optional)
 
@@ -40,7 +53,7 @@ OPENAI_MODEL=gpt-5
 
 **Note:** The system automatically falls back to the best available model from your OpenAI account. You only need to set this if you want to force a specific model.
 
-#### `BASE_DATA_PATH` (Optional)
+### `BASE_DATA_PATH`
 
 Base directory for all data storage. Defaults to `./data`.
 
@@ -62,7 +75,7 @@ BASE_DATA_PATH=./data
 └── output/         # Generated reports (CSV, HTML)
 ```
 
-#### Individual Path Overrides (Advanced)
+### Individual Path Overrides (Advanced)
 
 Override specific paths instead of using `BASE_DATA_PATH`:
 
@@ -75,7 +88,7 @@ OUTPUT_PATH=./custom_output
 
 **Note:** If `BASE_DATA_PATH` is set, these default to subdirectories of it. These overrides are only needed for non-standard layouts.
 
-#### `MAX_FILE_SIZE_MB` (Optional)
+### `MAX_FILE_SIZE_MB`
 
 Maximum file size for uploads in megabytes. Defaults to `2`.
 
@@ -83,7 +96,7 @@ Maximum file size for uploads in megabytes. Defaults to `2`.
 MAX_FILE_SIZE_MB=5
 ```
 
-## Configuration Examples
+## Examples
 
 ### Minimal Setup (Recommended)
 
@@ -120,14 +133,14 @@ python3 -m pytest tests/
 
 The CI/CD pipeline automatically uses `./test_data` to avoid conflicts with your local data.
 
-## Configuration Priority
+## Priority
 
 Settings are loaded in this order (highest priority first):
 
 1. **Environment variables** (set in shell or `.env` file)
 2. **Default values** (hardcoded in `config.py`)
 
-## Viewing Current Configuration
+## Inspect Current Configuration
 
 To see your current configuration:
 
