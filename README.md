@@ -119,7 +119,7 @@ python3 candidate_reviewer.py show-candidates "senior_engineer"
 python3 candidate_reviewer.py open-reports "senior_engineer"
 ```
 
-### Step 4: Teach the AI (optional but powerful)
+### Step 4: Teach the AI, add feedback, set filter guardrails, improve incrementally
 
 ```bash
 # Give feedback on evaluations (interactive)
