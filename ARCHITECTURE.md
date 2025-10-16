@@ -6,21 +6,14 @@ Audience: engineers and advanced users. One‑screen summary below.
 
 ```mermaid
 flowchart TD
-  A[CLI
-  candidate_reviewer.py] --> B[File Processor
-  file_processor.py]
-  A --> C[AI Client
-  ai_client.py]
-  C -->|prompt includes filters & insights| D[OpenAI]
-  D --> E[Evaluation JSON]
-  E --> F[Policy Enforcer
-  policy/filter_enforcer.py]
-  F --> G[Output Generator
-  output_generator.py]
-  A --> H[Feedback Manager
-  feedback_manager.py]
-  H --> I[Insights
-  jobs/{job}/insights.json]
+  A["CLI<br/>candidate_reviewer.py"] --> B["File Processor<br/>file_processor.py"]
+  A --> C["AI Client<br/>ai_client.py"]
+  C -->|prompt includes filters & insights| D["OpenAI"]
+  D --> E["Evaluation JSON"]
+  E --> F["Policy Enforcer<br/>policy/filter_enforcer.py"]
+  F --> G["Output Generator<br/>output_generator.py"]
+  A --> H["Feedback Manager<br/>feedback_manager.py"]
+  H --> I["Insights<br/>jobs/&lt;job&gt;/insights.json"]
   I --> C
 ```
 
