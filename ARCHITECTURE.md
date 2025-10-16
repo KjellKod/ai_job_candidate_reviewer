@@ -1,4 +1,34 @@
-# AI Job Candidate Reviewer - Architecture
+# Architecture (overview)
+
+Audience: engineers and advanced users. One‑screen summary below.
+
+## TL;DR Diagram
+
+```mermaid
+flowchart TD
+  A[CLI
+  candidate_reviewer.py] --> B[File Processor
+  file_processor.py]
+  A --> C[AI Client
+  ai_client.py]
+  C -->|prompt includes filters & insights| D[OpenAI]
+  D --> E[Evaluation JSON]
+  E --> F[Policy Enforcer
+  policy/filter_enforcer.py]
+  F --> G[Output Generator
+  output_generator.py]
+  A --> H[Feedback Manager
+  feedback_manager.py]
+  H --> I[Insights
+  jobs/{job}/insights.json]
+  I --> C
+```
+
+Key:
+- Filters: plain‑text rules embedded in the prompt; deterministically enforced post‑AI
+- Insights: generated every 2 feedbacks; fed back into evaluation
+
+---
 
 ## File Structure & Responsibilities
 
